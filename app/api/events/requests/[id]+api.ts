@@ -1,15 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
     const { action } = await request.json();
-    const requestId = params.id;
+    const url = new URL(request.url);
+    const requestId = url.pathname.split('/').pop();
 
     if (!action || !['accept', 'reject'].includes(action)) {
-      return NextResponse.json(
+      return Response.json(
         { error: 'Invalid action. Must be "accept" or "reject"' },
         { status: 400 }
       );
@@ -24,7 +20,7 @@ export async function POST(
     // 3. Send notification to requester
     // 4. Update event participant count
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: `Join request ${action}ed successfully`,
       requestId,
@@ -32,7 +28,7 @@ export async function POST(
     });
   } catch (error) {
     console.error('Error processing join request:', error);
-    return NextResponse.json(
+    return Response.json(
       { error: 'Failed to process join request' },
       { status: 500 }
     );

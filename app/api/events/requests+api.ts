@@ -1,6 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     // Mock data for join requests
     const joinRequests = [
@@ -24,10 +22,10 @@ export async function GET(request: NextRequest) {
       },
     ];
 
-    return NextResponse.json({ requests: joinRequests });
+    return Response.json({ requests: joinRequests });
   } catch (error) {
     console.error('Error fetching join requests:', error);
-    return NextResponse.json(
+    return Response.json(
       { error: 'Failed to fetch join requests' },
       { status: 500 }
     );

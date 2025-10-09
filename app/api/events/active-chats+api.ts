@@ -1,6 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     // Mock data for active chats
     const activeChats = [
@@ -33,10 +31,10 @@ export async function GET(request: NextRequest) {
       },
     ];
 
-    return NextResponse.json({ chats: activeChats });
+    return Response.json({ chats: activeChats });
   } catch (error) {
     console.error('Error fetching active chats:', error);
-    return NextResponse.json(
+    return Response.json(
       { error: 'Failed to fetch active chats' },
       { status: 500 }
     );
