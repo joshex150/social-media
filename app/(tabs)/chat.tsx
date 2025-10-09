@@ -1,11 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import ChatBox from "@/components/ChatBox";
+import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+
+interface Chat {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  participants: number;
+  lastMessage: string;
+  lastMessageTime: number;
+  unreadCount: number;
+}
+
+interface Message {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  timestamp: number;
+}
 
 export default function ChatScreen() {
-  const [activeChats, setActiveChats] = useState([]);
-  const [selectedChat, setSelectedChat] = useState(null);
+  const [activeChats, setActiveChats] = useState<Chat[]>([]);
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [loading, setLoading] = useState(true);
   const safeArea = useSafeAreaStyle();
 
@@ -26,7 +46,7 @@ export default function ChatScreen() {
     }
   };
 
-  const handleChatSelect = (chat) => {
+  const handleChatSelect = (chat: Chat) => {
     setSelectedChat(chat);
   };
 
@@ -35,9 +55,14 @@ export default function ChatScreen() {
     loadActiveChats(); // Refresh to get latest messages
   };
 
-  const handleSendMessage = async (message) => {
+  const handleSendMessage = async (message: any) => {
+    if (!selectedChat || !(selectedChat as any).eventId) {
+      Alert.alert('Error', 'No chat selected');
+      return;
+    }
     try {
-      const response = await fetch(`/api/events/${selectedChat.eventId}/messages`, {
+      const eventId = (selectedChat as any).eventId;
+      const response = await fetch(`/api/events/${eventId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -58,9 +83,10 @@ export default function ChatScreen() {
   if (selectedChat) {
     return (
       <View style={[styles.container, safeArea.content]}>
-        <View style={styles.chatHeader}>
+        <View style={[styles.chatHeader, safeArea.header]}>
           <TouchableOpacity onPress={handleBackToList} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <FontAwesome name="arrow-left" size={20} color="#000" />
+            <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
           <View style={styles.chatInfo}>
             <Text style={styles.chatTitle}>{selectedChat.eventTitle}</Text>
@@ -69,8 +95,9 @@ export default function ChatScreen() {
         </View>
         
         <ChatBox
-          eventId={selectedChat.eventId}
+          messages={[]} // TODO: Load messages for this chat
           onSendMessage={handleSendMessage}
+          onTyping={() => {}} // TODO: Implement typing indicator
         />
       </View>
     );
@@ -78,7 +105,7 @@ export default function ChatScreen() {
 
   return (
     <ScrollView style={[styles.container, safeArea.content]}>
-      <View style={styles.header}>
+      <View style={[styles.header, safeArea.header]}>
         <Text style={styles.title}>Active Chats</Text>
         <Text style={styles.subtitle}>Join conversations from your activities</Text>
       </View>
@@ -125,55 +152,58 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: PADDING.header.horizontal,
+    paddingVertical: PADDING.header.vertical,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: FONT_SIZES.xxxl,
+    fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
-    marginBottom: 4,
+    marginBottom: MARGIN.text.bottom,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.md,
     color: "#666",
   },
   chatHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: PADDING.header.horizontal,
+    paddingVertical: PADDING.header.vertical,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
     backgroundColor: "#fff",
   },
   backButton: {
-    marginRight: 12,
-    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: PADDING.content.vertical,
+    paddingVertical: MARGIN.text.bottom,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.md,
     color: "#000",
-    fontWeight: "500",
+    fontWeight: FONT_WEIGHTS.medium,
+    marginLeft: GAPS.small,
   },
   chatInfo: {
     flex: 1,
   },
   chatTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
   },
   chatSubtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.sm,
     color: "#666",
   },
   chatItem: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
@@ -181,18 +211,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chatEventTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
-    marginBottom: 4,
+    marginBottom: MARGIN.text.bottom,
   },
   chatLastMessage: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.sm,
     color: "#666",
-    marginBottom: 4,
+    marginBottom: MARGIN.text.bottom,
   },
   chatTime: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.xs,
     color: "#999",
   },
   chatMeta: {
@@ -201,15 +231,15 @@ const styles = StyleSheet.create({
   },
   participantCount: {
     backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 4,
+    borderRadius: BORDER_RADIUS.large,
+    paddingHorizontal: GAPS.small,
+    paddingVertical: MARGIN.text.bottom,
+    marginBottom: MARGIN.text.bottom,
   },
   participantCountText: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.xs,
     color: "#666",
-    fontWeight: "500",
+    fontWeight: FONT_WEIGHTS.medium,
   },
   unreadBadge: {
     backgroundColor: "#000",
@@ -220,23 +250,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   unreadText: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.xs,
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: FONT_WEIGHTS.semibold,
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: 48,
-    paddingHorizontal: 32,
+    paddingVertical: PADDING.content.horizontal * 3,
+    paddingHorizontal: PADDING.content.horizontal * 2,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
-    marginBottom: 8,
+    marginBottom: GAPS.small,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.sm,
     color: "#666",
     textAlign: "center",
     lineHeight: 20,

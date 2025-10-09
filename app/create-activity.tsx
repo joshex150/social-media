@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaStyle } from '@/hooks/useSafeAreaStyle';
 import { useRouter } from 'expo-router';
+import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '@/constants/spacing';
 
 export default function CreateActivityScreen() {
   const [formData, setFormData] = useState({
@@ -68,9 +69,9 @@ export default function CreateActivityScreen() {
 
   return (
     <ScrollView style={[styles.container, safeArea.content]}>
-      <View style={styles.header}>
+        <View style={[styles.header, safeArea.header]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Cancel</Text>
+          <Text style={styles.backButtonText}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Create Activity</Text>
         <View style={styles.placeholder} />
@@ -224,121 +225,122 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: PADDING.header.horizontal,
+    paddingVertical: PADDING.header.vertical,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    paddingVertical: 4,
+    paddingVertical: MARGIN.text.bottom,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.md,
     color: '#000',
-    fontWeight: '500',
+    fontWeight: FONT_WEIGHTS.medium,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: '#000',
   },
   placeholder: {
     width: 60, // Balance the back button
   },
   form: {
-    padding: 16,
+    padding: PADDING.content.horizontal,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: PADDING.content.horizontal + MARGIN.text.bottom,
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
+    gap: PADDING.content.vertical,
   },
   halfWidth: {
     flex: 1,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
     color: '#000',
-    marginBottom: 8,
+    marginBottom: GAPS.small,
   },
   input: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderRadius: BORDER_RADIUS.medium,
+    paddingHorizontal: PADDING.input.horizontal,
+    paddingVertical: PADDING.input.vertical + 8,
+    fontSize: FONT_SIZES.md,
     color: '#000',
     backgroundColor: '#fff',
+    minHeight: 50,
   },
   textArea: {
-    height: 100,
+    height: 120,
     textAlignVertical: 'top',
   },
   categoryScroll: {
-    marginTop: 8,
+    marginTop: GAPS.small,
   },
   categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.buttonSmall.vertical,
+    borderRadius: BORDER_RADIUS.full,
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginRight: 8,
+    marginRight: GAPS.small,
   },
   categoryButtonActive: {
     backgroundColor: '#000',
     borderColor: '#000',
   },
   categoryButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.sm,
     color: '#666',
-    fontWeight: '500',
+    fontWeight: FONT_WEIGHTS.medium,
   },
   categoryButtonTextActive: {
     color: '#fff',
   },
   radiusScroll: {
-    marginTop: 8,
+    marginTop: GAPS.small,
   },
   radiusButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.buttonSmall.vertical,
+    borderRadius: BORDER_RADIUS.full,
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginRight: 8,
+    marginRight: GAPS.small,
   },
   radiusButtonActive: {
     backgroundColor: '#000',
     borderColor: '#000',
   },
   radiusButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.sm,
     color: '#666',
-    fontWeight: '500',
+    fontWeight: FONT_WEIGHTS.medium,
   },
   radiusButtonTextActive: {
     color: '#fff',
   },
   submitButton: {
     backgroundColor: '#000',
-    borderRadius: 8,
-    paddingVertical: 16,
+    borderRadius: BORDER_RADIUS.medium,
+    paddingVertical: PADDING.button.horizontal,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: PADDING.content.horizontal + MARGIN.text.bottom,
   },
   submitButtonDisabled: {
     opacity: 0.5,
   },
   submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: '#fff',
   },
 });

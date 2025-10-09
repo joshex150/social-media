@@ -12,10 +12,10 @@ import {
 import PagerView from "react-native-pager-view";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 // Import each screen statically
 import HomeScreen from "./index";
-import ExploreScreen from "./explore";
 import ProfileScreen from "./profile";
 import ChatScreen from "./chat";
 import MapScreen from "./map";
@@ -29,10 +29,10 @@ const screens = [
   },
   { name: "index", title: "Home", icon: "home", component: HomeScreen },
   {
-    name: "explore",
-    title: "Explore",
-    icon: "compass",
-    component: ExploreScreen,
+    name: "create",
+    title: "Create",
+    icon: "plus",
+    component: null, // This will be handled specially
   },
   { name: "chat", title: "Chat", icon: "comment", component: ChatScreen },
   { name: "profile", title: "Profile", icon: "user", component: ProfileScreen },
@@ -54,7 +54,10 @@ function CustomTabBar({ currentIndex, onTabPress, insets }: any) {
       ]}
     >
       {screens.map((screen, index) => {
-        const isFocused = currentIndex === index;
+        // Adjust currentIndex for the create tab since it's not in the PagerView
+        const adjustedIndex = screen.name === "create" ? -1 : 
+          screens.filter(s => s.component !== null).findIndex(s => s.name === screen.name);
+        const isFocused = currentIndex === adjustedIndex;
         const color = isFocused
           ? isDark
             ? "#fff"
@@ -69,10 +72,7 @@ function CustomTabBar({ currentIndex, onTabPress, insets }: any) {
             style={styles.tabItem}
             activeOpacity={0.8}
           >
-            <FontAwesome name={screen.icon as any} size={23} color={color} />
-            <Text style={{ color, fontSize: 12, marginTop: 4 }}>
-              {screen.title}
-            </Text>
+            <FontAwesome name={screen.icon as any} size={28} color={color} />
           </TouchableOpacity>
         );
       })}
@@ -89,6 +89,7 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const TOTAL_GAP = 24; // total gap between pages
   const HALF_GAP = TOTAL_GAP / 2;
@@ -106,12 +107,23 @@ export default function TabLayout() {
   };
 
   const handleTabPress = (index: number) => {
-    pagerRef.current?.setPage(index);
-    setPage(index);
+    const screen = screens[index];
+    if (screen.name === "create") {
+      // Navigate to create activity page instead of changing tab
+      router.push("/create-activity");
+      return;
+    }
+    
+    // Map the tab index to the PagerView index (excluding create tab)
+    const pagerIndex = screens.filter(s => s.component !== null).findIndex(s => s.name === screen.name);
+    if (pagerIndex !== -1) {
+      pagerRef.current?.setPage(pagerIndex);
+      setPage(pagerIndex);
+    }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: gapColor, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: gapColor }]}>
       <PagerView
         ref={pagerRef}
         style={styles.pager}
@@ -120,7 +132,7 @@ export default function TabLayout() {
         onPageSelected={handlePageSelected}
         pageMargin={Platform.OS === "android" ? TOTAL_GAP : 0}
       >
-        {screens.map((screen, idx) => {
+        {screens.filter(screen => screen.component !== null).map((screen, idx) => {
           const distance = indexAnim.interpolate({
             inputRange: [idx - 1, idx, idx + 1],
             outputRange: [1, 0, 1],
@@ -199,6 +211,8 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     alignItems: "center",
+    justifyContent: "center",
     flex: 1,
+    paddingVertical: 8,
   },
 });

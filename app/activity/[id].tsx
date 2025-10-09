@@ -8,17 +8,39 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from '@/hooks/useSafeAreaStyle';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView from '@/components/MapView';
 import ChatBox from '@/components/ChatBox';
 import FeedbackModal from '@/components/FeedbackModal';
 
+interface Activity {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  location: string;
+  startTime: number;
+  maxParticipants: number;
+  distance: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface Participant {
+  id: string;
+  name: string;
+  status: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 const { width } = Dimensions.get('window');
 
 export default function ActivityDetailsScreen() {
-  const [activity, setActivity] = useState(null);
-  const [participants, setParticipants] = useState([]);
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [showFeedback, setShowFeedback] = useState(false);
@@ -67,7 +89,7 @@ export default function ActivityDetailsScreen() {
     }
   };
 
-  const handleSendMessage = async (message) => {
+  const handleSendMessage = async (message: string) => {
     try {
       const response = await fetch(`/api/events/${id}/messages`, {
         method: 'POST',
@@ -143,7 +165,8 @@ export default function ActivityDetailsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <FontAwesome name="arrow-left" size={20} color="#000" />
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{activity.title}</Text>
         <TouchableOpacity onPress={() => setShowFeedback(true)} style={styles.feedbackButton}>
@@ -289,12 +312,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
   },
   backButton: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 4,
   },
   backButtonText: {
     fontSize: 16,
     color: '#000',
     fontWeight: '500',
+    marginLeft: 8,
   },
   title: {
     fontSize: 18,

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Button, useColorScheme, Text, Platform } from "react-native";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Image } from "expo-image";
 import { Asset } from "expo-asset";
 import { useUserLocation } from "@/components";
@@ -101,7 +102,10 @@ export default function MapScreen() {
           Events nearby: {events.length}
         </Text>
         {ghostMode && (
-          <Text style={styles.ghostModeText}>👻 Ghost Mode Active</Text>
+          <View style={styles.ghostModeContainer}>
+            <FontAwesome name="eye-slash" size={16} color="#666" />
+            <Text style={styles.ghostModeText}>Ghost Mode Active</Text>
+          </View>
         )}
       </View>
     </View>
@@ -271,5 +275,10 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: "rgba(255,0,0,0.3)",
+  },
+  ghostModeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
   },
 });
