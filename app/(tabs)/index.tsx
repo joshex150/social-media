@@ -387,8 +387,8 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.bold,
   },
   statsContainer: {
-    marginTop: PADDING.content.horizontal,
-    paddingHorizontal: PADDING.section.horizontal,
+    marginTop: PADDING.content.vertical,
+    paddingHorizontal: PADDING.section.vertical,
     paddingVertical: PADDING.section.vertical,
     gap: GAPS.medium,
   },
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     color: "#e5e7eb",
   },
   section: {
-    paddingHorizontal: PADDING.section.horizontal,
+    paddingHorizontal: PADDING.section.vertical,
     paddingVertical: PADDING.section.vertical,
   },
   sectionHeader: {
