@@ -44,14 +44,14 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#f5f5f5',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 12,
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
   vibesContainer: {

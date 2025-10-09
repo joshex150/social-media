@@ -3,6 +3,7 @@ import { StyleSheet, ScrollView, View, Text, Alert } from "react-native";
 import SubscriptionTier from "@/components/SubscriptionTier";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 
 export default function SubscriptionScreen() {
   const [tiers, setTiers] = useState<any>({});
@@ -11,6 +12,7 @@ export default function SubscriptionScreen() {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showDailySuggestions, setShowDailySuggestions] = useState(false);
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
+  const safeArea = useSafeAreaStyle();
 
   useEffect(() => {
     loadSubscriptionData();
@@ -56,8 +58,8 @@ export default function SubscriptionScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, safeArea.content]} contentContainerStyle={styles.contentContainer}>
+      <View style={[styles.header]}>
         <Text style={styles.title}>Subscription</Text>
         {usage.activities >= usage.maxActivities && currentTier === 'free' && (
           <View style={styles.limitBanner}>
@@ -111,21 +113,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   contentContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
     color: "#000",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   limitBanner: {
     backgroundColor: "#000",
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
   },
   limitTitle: {
     fontSize: 16,
@@ -140,8 +143,8 @@ const styles = StyleSheet.create({
   suggestionsCard: {
     backgroundColor: "#f5f5f5",
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 12,
   },
   suggestionsTitle: {
     fontSize: 18,
@@ -156,14 +159,14 @@ const styles = StyleSheet.create({
   usageCard: {
     backgroundColor: "#f5f5f5",
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    padding: 12,
+    marginBottom: 16,
   },
   usageTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#000",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   usageText: {
     fontSize: 14,

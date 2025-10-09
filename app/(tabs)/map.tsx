@@ -1,16 +1,35 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Button, useColorScheme } from "react-native";
+import { View, StyleSheet, Button, useColorScheme, Text, Platform } from "react-native";
 import { Image } from "expo-image";
 import { Asset } from "expo-asset";
-import MapboxGL from "@rnmapbox/maps";
 import { useUserLocation } from "@/components";
 // import footprint from "../../assets/images/foot.png";
 // import male from "@/assets/images/male.png";
 import mockData from "../api/index.json";
 
-MapboxGL.setAccessToken(
-  "sk.eyJ1IjoieWVsZWthY2hpIiwiYSI6ImNtZmJoOXBnNDFzNW8yaXBmdWMwc3MxdTMifQ.qbjaBUFpFXIQazD-Ci830A"
-);
+// Conditional Mapbox import for simulator compatibility
+let MapboxGL;
+const isSimulator = Platform.OS === 'ios' && __DEV__; // iOS Simulator detection
+const forceFallback = process.env.EXPO_PUBLIC_FORCE_MAP_FALLBACK === 'true';
+
+try {
+  if (isSimulator || forceFallback) {
+    console.warn("Mapbox disabled for simulator/fallback mode");
+    MapboxGL = null;
+  } else {
+    MapboxGL = require("@rnmapbox/maps");
+  }
+} catch (error) {
+  console.warn("Mapbox not available, using fallback");
+  MapboxGL = null;
+}
+
+// Only set access token if Mapbox is available
+if (MapboxGL) {
+  MapboxGL.setAccessToken(
+    "sk.eyJ1IjoieWVsZWthY2hpIiwiYSI6ImNtZmJoOXBnNDFzNW8yaXBmdWMwc3MxdTMifQ.qbjaBUFpFXIQazD-Ci830A"
+  );
+}
 
 interface Friend {
   id: string;
@@ -41,8 +60,9 @@ export default function MapScreen() {
 
   // Detect system theme (light | dark)
   const colorScheme = useColorScheme();
-  const mapStyle =
-    colorScheme === "dark" ? MapboxGL.StyleURL.Dark : MapboxGL.StyleURL.Light;
+  const mapStyle = MapboxGL ? 
+    (colorScheme === "dark" ? MapboxGL.StyleURL.Dark : MapboxGL.StyleURL.Light) : 
+    null;
 
   useEffect(() => {
     async function fetchData() {
@@ -60,6 +80,33 @@ export default function MapScreen() {
 
   if (!userLocation) return null;
 
+  // Fallback component for when Mapbox is not available
+  const MapFallback = () => (
+    <View style={[styles.map, styles.fallbackMap]}>
+      <View style={styles.fallbackContent}>
+        <Text style={styles.fallbackTitle}>Map View</Text>
+        <Text style={styles.fallbackSubtitle}>
+          {Platform.OS === 'ios' ? 'iOS Simulator' : 'Android Emulator'} detected
+        </Text>
+        <Text style={styles.fallbackText}>
+          Mapbox requires a physical device for full functionality.
+        </Text>
+        <Text style={styles.fallbackText}>
+          Your location: {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
+        </Text>
+        <Text style={styles.fallbackText}>
+          Friends nearby: {friends.length}
+        </Text>
+        <Text style={styles.fallbackText}>
+          Events nearby: {events.length}
+        </Text>
+        {ghostMode && (
+          <Text style={styles.ghostModeText}>👻 Ghost Mode Active</Text>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       {/* Ghost Mode Toggle */}
@@ -70,16 +117,17 @@ export default function MapScreen() {
         />
       </View>
 
-      <MapboxGL.MapView
-        style={styles.map}
-        styleURL={mapStyle}
-        logoEnabled={false}
-        attributionEnabled={false}
-        scrollEnabled={true}
-        zoomEnabled={true}
-        rotateEnabled={false} // ❌ disable rotation
-        pitchEnabled={false} // ❌ disable tilt (3D)
-      >
+      {MapboxGL ? (
+        <MapboxGL.MapView
+          style={styles.map}
+          styleURL={mapStyle}
+          logoEnabled={false}
+          attributionEnabled={false}
+          scrollEnabled={true}
+          zoomEnabled={true}
+          rotateEnabled={false} // ❌ disable rotation
+          pitchEnabled={false} // ❌ disable tilt (3D)
+        >
         {/* Camera follows user */}
         <MapboxGL.Camera
           zoomLevel={3}
@@ -151,7 +199,10 @@ export default function MapScreen() {
             />
           </MapboxGL.PointAnnotation>
         ))}
-      </MapboxGL.MapView>
+        </MapboxGL.MapView>
+      ) : (
+        <MapFallback />
+      )}
     </View>
   );
 }
@@ -159,6 +210,38 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  fallbackMap: {
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackContent: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  fallbackTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  fallbackSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
+  fallbackText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  ghostModeText: {
+    fontSize: 16,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 10,
+  },
   userMarker: {
     width: 20,
     height: 20,

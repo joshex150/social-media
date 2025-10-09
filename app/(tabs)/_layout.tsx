@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import PagerView from "react-native-pager-view";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Import each screen statically
 import HomeScreen from "./index";
@@ -37,7 +38,7 @@ const screens = [
   { name: "profile", title: "Profile", icon: "user", component: ProfileScreen },
 ];
 
-function CustomTabBar({ currentIndex, onTabPress }: any) {
+function CustomTabBar({ currentIndex, onTabPress, insets }: any) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -48,6 +49,7 @@ function CustomTabBar({ currentIndex, onTabPress }: any) {
         {
           backgroundColor: isDark ? "#0b0b0b" : "#fff",
           borderColor: isDark ? "#222" : "#eee",
+          paddingBottom: insets.bottom,
         },
       ]}
     >
@@ -86,6 +88,7 @@ export default function TabLayout() {
   const [page, setPage] = useState(0);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
 
   const TOTAL_GAP = 24; // total gap between pages
   const HALF_GAP = TOTAL_GAP / 2;
@@ -108,7 +111,7 @@ export default function TabLayout() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: gapColor }]}>
+    <View style={[styles.container, { backgroundColor: gapColor, paddingTop: insets.top }]}>
       <PagerView
         ref={pagerRef}
         style={styles.pager}
@@ -164,7 +167,7 @@ export default function TabLayout() {
         })}
       </PagerView>
 
-      <CustomTabBar currentIndex={page} onTabPress={handleTabPress} />
+      <CustomTabBar currentIndex={page} onTabPress={handleTabPress} insets={insets} />
     </View>
   );
 }
@@ -191,8 +194,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 30,
-    paddingBottom: 50,
+    paddingVertical: 12,
     borderTopWidth: 1,
   },
   tabItem: {

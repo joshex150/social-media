@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
@@ -80,10 +80,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   limits: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   limitText: {
     fontSize: 14,
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   features: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   featureText: {
     fontSize: 14,

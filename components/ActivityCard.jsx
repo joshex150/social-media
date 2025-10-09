@@ -49,13 +49,13 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
   header: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   title: {
     fontSize: 18,
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   details: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   distance: {
     fontSize: 14,

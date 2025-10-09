@@ -37,3 +37,17 @@ jest.mock('expo-asset', () => ({
     fromModule: jest.fn(() => ({ uri: 'mock-uri' }))
   }
 }));
+
+// Mock expo-font
+jest.mock('expo-font', () => ({
+  useFonts: jest.fn(() => [true, null]),
+  loadAsync: jest.fn(() => Promise.resolve()),
+  isLoaded: jest.fn(() => true),
+  isAssetLoaded: jest.fn(() => true),
+}));
+
+// Mock expo-splash-screen
+jest.mock('expo-splash-screen', () => ({
+  hideAsync: jest.fn(() => Promise.resolve()),
+  preventAutoHideAsync: jest.fn(() => Promise.resolve()),
+}));

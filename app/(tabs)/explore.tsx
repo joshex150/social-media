@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, FlatList, View, Text, TouchableOpacity, Alert } from "react-native";
+import { useRouter } from "expo-router";
 import ActivityCard from "@/components/ActivityCard";
 import VibeCheck from "@/components/VibeCheck";
+import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 
 export default function Dashboard() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState(10);
+  const safeArea = useSafeAreaStyle();
+  const router = useRouter();
 
   useEffect(() => {
     loadActivities();
@@ -48,8 +52,7 @@ export default function Dashboard() {
   };
 
   const handleView = (activityId: string) => {
-    // Navigate to activity details
-    console.log('View activity:', activityId);
+    router.push(`/activity/${activityId}`);
   };
 
   const handleVibeFeedback = async (vibe: string) => {
@@ -64,8 +67,8 @@ export default function Dashboard() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, safeArea.content]}>
+      <View style={[styles.header]}>
         <Text style={styles.title}>Discover Activities</Text>
         <View style={styles.filterContainer}>
           <Text style={styles.filterLabel}>Filter by radius</Text>
@@ -110,7 +113,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
@@ -118,7 +122,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#000",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   filterContainer: {
     marginBottom: 8,
@@ -153,12 +157,13 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   listContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 48,
+    paddingVertical: 32,
   },
   emptyTitle: {
     fontSize: 18,

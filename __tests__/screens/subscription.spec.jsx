@@ -116,13 +116,18 @@ describe('Subscription Screen', () => {
       })
     });
 
-    const { getByTestId } = render(<SubscriptionScreen />);
+    const { getAllByTestId } = render(<SubscriptionScreen />);
     
     await waitFor(() => {
-      expect(getByTestId('tier-name')).toHaveTextContent('Free');
-      expect(getByTestId('tier-price')).toHaveTextContent('$0');
-      expect(getByTestId('tier-activities')).toHaveTextContent('3 activities');
-      expect(getByTestId('tier-radius')).toHaveTextContent('10km radius');
+      const tierNames = getAllByTestId('tier-name');
+      const tierPrices = getAllByTestId('tier-price');
+      const tierActivities = getAllByTestId('tier-activities');
+      const tierRadius = getAllByTestId('tier-radius');
+      
+      expect(tierNames[0]).toHaveTextContent('free');
+      expect(tierPrices[0]).toHaveTextContent('$0');
+      expect(tierActivities[0]).toHaveTextContent('3 activities');
+      expect(tierRadius[0]).toHaveTextContent('10km radius');
     });
   });
 
@@ -172,10 +177,11 @@ describe('Subscription Screen', () => {
         json: () => Promise.resolve({ success: true, newTier: 'silver' })
       });
 
-    const { getByTestId } = render(<SubscriptionScreen />);
+    const { getAllByTestId } = render(<SubscriptionScreen />);
     
     await waitFor(() => {
-      fireEvent.press(getByTestId('upgrade-button'));
+      const upgradeButtons = getAllByTestId('upgrade-button');
+      fireEvent.press(upgradeButtons[0]); // Press first upgrade button
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -304,10 +310,11 @@ describe('Subscription Screen', () => {
       })
       .mockRejectedValueOnce(new Error('Payment failed'));
 
-    const { getByTestId, getByText } = render(<SubscriptionScreen />);
+    const { getAllByTestId, getByText } = render(<SubscriptionScreen />);
     
     await waitFor(() => {
-      fireEvent.press(getByTestId('upgrade-button'));
+      const upgradeButtons = getAllByTestId('upgrade-button');
+      fireEvent.press(upgradeButtons[0]);
     });
 
     await waitFor(() => {

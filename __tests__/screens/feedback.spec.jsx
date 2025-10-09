@@ -137,7 +137,7 @@ describe('Feedback Modal', () => {
     
     // Select emotion and rating
     fireEvent.press(getByTestId('emotion-happy'));
-    fireEvent(getByTestId('slider'), 'onValueChange', 4);
+    fireEvent(getByTestId('rating-4'), 'onPress');
     
     // Submit feedback
     fireEvent.press(getByTestId('submit-button'));
