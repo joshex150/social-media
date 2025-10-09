@@ -1,5 +1,6 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
+import { PADDING } from '@/constants/spacing';
 
 /**
  * Custom hook for Dynamic Island and safe area handling
@@ -20,17 +21,17 @@ export function useSafeAreaStyle() {
     // Header styles that avoid Dynamic Island
     header: {
       paddingTop: Math.max(insets.top, 44), // Ensure minimum 44pt header height
-      paddingBottom: 12,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingBottom: PADDING.header.vertical,
+      paddingLeft: 8,
+      paddingRight: 8,
     },
     
     // Content styles that respect safe areas
     content: {
-      paddingTop: 8,
-      paddingBottom: Math.max(insets.bottom, 8),
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingTop: PADDING.content.vertical,
+      paddingBottom: Math.max(insets.bottom, PADDING.content.vertical),
+      paddingLeft: 8,
+      paddingRight: 8,
     },
     
     // Tab bar styles

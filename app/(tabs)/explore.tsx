@@ -92,7 +92,7 @@ export default function Dashboard() {
 
       <FlatList
         data={activities}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => (item as { id: string }).id}
         renderItem={({ item }) => (
           <ActivityCard
             activity={item}
