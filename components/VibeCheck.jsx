@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function VibeCheck({ onFeedback }) {
   const [selected, setSelected] = useState(null);
 
   const vibes = [
-    { id: 'happy', emoji: '😊', label: 'Happy' },
-    { id: 'neutral', emoji: '😐', label: 'Neutral' },
-    { id: 'sad', emoji: '😔', label: 'Sad' },
+    { id: 'happy', icon: 'smile-o', label: 'Happy' },
+    { id: 'neutral', icon: 'meh-o', label: 'Neutral' },
+    { id: 'sad', icon: 'frown-o', label: 'Sad' },
   ];
 
   const handleSelect = async (vibe) => {
@@ -31,7 +32,7 @@ export default function VibeCheck({ onFeedback }) {
             ]}
             onPress={() => handleSelect(vibe.id)}
           >
-            <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
+            <FontAwesome name={vibe.icon} size={32} color="#000" />
             <Text style={styles.vibeLabel}>{vibe.label}</Text>
           </TouchableOpacity>
         ))}

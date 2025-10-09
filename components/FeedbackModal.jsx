@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 const EmotionSelector = ({ onSelect, selected }) => {
   const emotions = [
-    { id: 'happy', emoji: '😊', label: 'Happy' },
-    { id: 'neutral', emoji: '😐', label: 'Neutral' },
-    { id: 'sad', emoji: '😔', label: 'Sad' },
-    { id: 'excited', emoji: '🤩', label: 'Excited' },
-    { id: 'tired', emoji: '😴', label: 'Tired' },
+    { id: 'happy', icon: 'smile-o', label: 'Happy' },
+    { id: 'neutral', icon: 'meh-o', label: 'Neutral' },
+    { id: 'sad', icon: 'frown-o', label: 'Sad' },
+    { id: 'excited', icon: 'star', label: 'Excited' },
+    { id: 'tired', icon: 'bed', label: 'Tired' },
   ];
 
   return (
@@ -22,7 +23,7 @@ const EmotionSelector = ({ onSelect, selected }) => {
           ]}
           onPress={() => onSelect(emotion.id)}
         >
-          <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
+          <FontAwesome name={emotion.icon} size={32} color="#000" />
           <Text style={styles.emotionLabel}>{emotion.label}</Text>
         </TouchableOpacity>
       ))}
@@ -123,7 +124,7 @@ export default function FeedbackModal({ visible, event, onClose, onSubmit }) {
             onPress={onClose}
             testID="close-button"
           >
-            <Text style={styles.closeButtonText}>✕</Text>
+            <FontAwesome name="times" size={20} color="#666" />
           </TouchableOpacity>
 
           <Text style={styles.title}>How was your experience?</Text>

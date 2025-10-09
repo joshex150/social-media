@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function SubscriptionTier({ tier, isActive, onUpgrade, limits }) {
   const { name, price, maxActivities, maxRadius, features } = limits;
@@ -25,7 +26,10 @@ export default function SubscriptionTier({ tier, isActive, onUpgrade, limits }) 
       {features && features.length > 0 && (
         <View style={styles.features}>
           {features.map((feature, index) => (
-            <Text key={index} style={styles.featureText}>• {feature}</Text>
+            <View key={index} style={styles.featureItem}>
+              <FontAwesome name="check" size={14} color="#10b981" />
+              <Text style={styles.featureText}>{feature}</Text>
+            </View>
           ))}
         </View>
       )}
@@ -93,10 +97,15 @@ const styles = StyleSheet.create({
   features: {
     marginBottom: 12,
   },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   featureText: {
     fontSize: 14,
     color: '#333',
-    marginBottom: 4,
+    marginLeft: 8,
   },
   upgradeButton: {
     backgroundColor: '#000',
