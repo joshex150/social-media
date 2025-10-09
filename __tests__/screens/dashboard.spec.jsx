@@ -88,12 +88,16 @@ describe('Dashboard Screen', () => {
   });
 
   it('displays activity information correctly', async () => {
-    const { getByTestId } = render(<Dashboard />);
+    const { getAllByTestId } = render(<Dashboard />);
     
     await waitFor(() => {
-      expect(getByTestId('activity-title')).toHaveTextContent('Morning Coffee Walk');
-      expect(getByTestId('activity-category')).toHaveTextContent('Social');
-      expect(getByTestId('activity-distance')).toHaveTextContent('2.5km');
+      const titles = getAllByTestId('activity-title');
+      const categories = getAllByTestId('activity-category');
+      const distances = getAllByTestId('activity-distance');
+      
+      expect(titles[0]).toHaveTextContent('Morning Coffee Walk');
+      expect(categories[0]).toHaveTextContent('Social');
+      expect(distances[0]).toHaveTextContent('2.5km');
     });
   });
 
@@ -145,27 +149,34 @@ describe('Dashboard Screen', () => {
   });
 
   it('handles join activity', async () => {
-    const { getByTestId, queryByText } = render(<Dashboard />);
+    const { getAllByTestId } = render(<Dashboard />);
     
     await waitFor(() => {
-      expect(getByTestId('join-button')).toBeTruthy();
+      const joinButtons = getAllByTestId('join-button');
+      expect(joinButtons.length).toBeGreaterThan(0);
     });
     
     await act(async () => {
-      fireEvent.press(getByTestId('join-button'));
+      const joinButtons = getAllByTestId('join-button');
+      fireEvent.press(joinButtons[0]);
     });
     
-    // Should show join request sent in alert
+    // Join request is sent via API
     await waitFor(() => {
-      expect(queryByText('Join request sent')).toBeTruthy();
-    }, { timeout: 1000 });
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/events/'),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
   });
 
   it('handles view activity', async () => {
-    const { getByTestId } = render(<Dashboard />);
+    const { getAllByTestId } = render(<Dashboard />);
     
     await waitFor(() => {
-      fireEvent.press(getByTestId('view-button'));
+      const viewButtons = getAllByTestId('view-button');
+      expect(viewButtons.length).toBeGreaterThan(0);
+      fireEvent.press(viewButtons[0]);
     });
     
     // Should navigate to activity details
