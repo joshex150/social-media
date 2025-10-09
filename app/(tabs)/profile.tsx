@@ -1,108 +1,131 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, ScrollView, View, Text, Alert } from "react-native";
-import SubscriptionTier from "@/components/SubscriptionTier";
-import UpgradePrompt from "@/components/UpgradePrompt";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 
-export default function SubscriptionScreen() {
-  const [tiers, setTiers] = useState<any>({});
-  const [currentTier, setCurrentTier] = useState('free');
-  const [usage, setUsage] = useState({ activities: 0, daysUsed: 0, maxActivities: 3 });
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-  const [showDailySuggestions, setShowDailySuggestions] = useState(false);
-  const [dismissedPrompt, setDismissedPrompt] = useState(false);
+export default function ProfileScreen() {
+  const [user, setUser] = useState({
+    name: "John Doe",
+    email: "john.doe@example.com",
+    joinDate: "January 2024",
+    totalActivities: 12,
+    totalConnections: 8,
+    currentTier: "free"
+  });
+  const [stats, setStats] = useState({
+    activitiesCreated: 12,
+    activitiesJoined: 8,
+    connectionsMade: 8,
+    streakDays: 5
+  });
   const safeArea = useSafeAreaStyle();
+  const router = useRouter();
 
-  useEffect(() => {
-    loadSubscriptionData();
-  }, []);
-
-  const loadSubscriptionData = async () => {
-    try {
-      const response = await fetch('/api/subscription');
-      const data = await response.json();
-      
-      setTiers(data.tiers);
-      setCurrentTier(data.currentTier);
-      setUsage(data.usage);
-      setShowUpgradePrompt(data.showUpgradePrompt);
-      setShowDailySuggestions(data.showDailySuggestions);
-    } catch (error) {
-      console.error('Failed to load subscription data:', error);
+  const settingsItems = [
+    {
+      id: 'subscription',
+      title: 'Subscription & Billing',
+      subtitle: 'Manage your plan and payments',
+      icon: 'credit-card',
+      onPress: () => router.push('/subscription-settings' as any)
+    },
+    {
+      id: 'notifications',
+      title: 'Notifications',
+      subtitle: 'Control your notification preferences',
+      icon: 'bell',
+      onPress: () => router.push('/notification-settings' as any)
+    },
+    {
+      id: 'privacy',
+      title: 'Privacy & Security',
+      subtitle: 'Manage your privacy settings',
+      icon: 'shield',
+      onPress: () => router.push('/privacy-settings' as any)
+    },
+    {
+      id: 'help',
+      title: 'Help & Support',
+      subtitle: 'Get help and contact support',
+      icon: 'question-circle',
+      onPress: () => router.push('/help-support' as any)
+    },
+    {
+      id: 'about',
+      title: 'About',
+      subtitle: 'App version and information',
+      icon: 'info-circle',
+      onPress: () => router.push('/about' as any)
     }
-  };
-
-  const handleUpgrade = async (tier: string) => {
-    try {
-      const response = await fetch('/api/subscription/upgrade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        Alert.alert('Success', `Successfully upgraded to ${tiers[tier].name}!`);
-        setCurrentTier(tier);
-        setShowUpgradePrompt(false);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Upgrade failed. Please try again.');
-    }
-  };
-
-  const handleDismissPrompt = () => {
-    setDismissedPrompt(true);
-  };
+  ];
 
   return (
-    <ScrollView style={[styles.container, safeArea.content]} contentContainerStyle={styles.contentContainer}>
-      <View style={[styles.header]}>
-        <Text style={styles.title}>Subscription</Text>
-        {usage.activities >= usage.maxActivities && currentTier === 'free' && (
-          <View style={styles.limitBanner}>
-            <Text style={styles.limitTitle}>Activity limit reached</Text>
-            <Text style={styles.limitSubtitle}>Upgrade to create more activities</Text>
+    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+      {/* Header */}
+      <View style={[styles.header, safeArea.header]}>
+        <Text style={styles.title}>Profile</Text>
+      </View>
+
+      {/* User Profile Card */}
+      <View style={styles.profileCard}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <FontAwesome name="user" size={40} color="#fff" />
           </View>
-        )}
-      </View>
-
-      {showUpgradePrompt && !dismissedPrompt && (
-        <UpgradePrompt
-          onUpgrade={() => handleUpgrade('silver')}
-          onDismiss={handleDismissPrompt}
-          daysUsed={usage.daysUsed}
-        />
-      )}
-
-      {showDailySuggestions && (
-        <View style={styles.suggestionsCard}>
-          <Text style={styles.suggestionsTitle}>Daily Suggestions</Text>
-          <Text style={styles.suggestionsSubtitle}>Based on your interests</Text>
+          <TouchableOpacity style={styles.editButton}>
+            <FontAwesome name="camera" size={16} color="#000" />
+          </TouchableOpacity>
         </View>
-      )}
-
-      <View style={styles.usageCard}>
-        <Text style={styles.usageTitle}>Your Usage</Text>
-        <Text style={styles.usageText}>
-          {usage.activities} / {usage.maxActivities === -1 ? '∞' : usage.maxActivities} activities used
-        </Text>
-        <Text style={styles.usageText}>{usage.daysUsed} days active</Text>
+        <Text style={styles.userName}>{user.name}</Text>
+        <Text style={styles.userEmail}>{user.email}</Text>
+        <Text style={styles.joinDate}>Member since {user.joinDate}</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Available Plans</Text>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats.activitiesCreated}</Text>
+          <Text style={styles.statLabel}>Created</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats.activitiesJoined}</Text>
+          <Text style={styles.statLabel}>Joined</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats.connectionsMade}</Text>
+          <Text style={styles.statLabel}>Connections</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats.streakDays}</Text>
+          <Text style={styles.statLabel}>Day Streak</Text>
+        </View>
+      </View>
 
-      {Object.entries(tiers).map(([key, tier]: [string, any]) => (
-        <SubscriptionTier
-          key={key}
-          tier={key}
-          isActive={currentTier === key}
-          onUpgrade={handleUpgrade}
-          limits={tier}
-        />
+      {/* Settings Section */}
+      <Text style={styles.sectionTitle}>Settings</Text>
+      
+      {settingsItems.map((item) => (
+        <TouchableOpacity key={item.id} style={styles.settingItem} onPress={item.onPress}>
+          <View style={styles.settingLeft}>
+            <View style={styles.settingIcon}>
+              <FontAwesome name={item.icon as any} size={20} color="#000" />
+            </View>
+            <View style={styles.settingText}>
+              <Text style={styles.settingTitle}>{item.title}</Text>
+              <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+            </View>
+          </View>
+          <FontAwesome name="chevron-right" size={16} color="#ccc" />
+        </TouchableOpacity>
       ))}
+
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logoutButton} onPress={() => Alert.alert('Logout', 'Are you sure you want to logout?')}>
+        <FontAwesome name="sign-out" size={20} color="#ff4444" />
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -113,70 +136,143 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: PADDING.content.vertical,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: FONT_SIZES.xxxl,
+    fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
-    marginBottom: 12,
   },
-  limitBanner: {
+  profileCard: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.large,
+    padding: PADDING.card.horizontal,
+    alignItems: "center",
+    marginBottom: PADDING.content.vertical,
+  },
+  avatarContainer: {
+    position: "relative",
+    marginBottom: GAPS.medium,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: "#000",
-    borderRadius: 12,
-    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  limitTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-    marginBottom: 4,
+  editButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#f8f9fa",
   },
-  limitSubtitle: {
-    fontSize: 14,
-    color: "#ccc",
-  },
-  suggestionsCard: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  suggestionsTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  userName: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
-    marginBottom: 4,
+    marginBottom: GAPS.small,
   },
-  suggestionsSubtitle: {
-    fontSize: 14,
+  userEmail: {
+    fontSize: FONT_SIZES.md,
     color: "#666",
+    marginBottom: GAPS.small,
   },
-  usageCard: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+  joinDate: {
+    fontSize: FONT_SIZES.sm,
+    color: "#999",
   },
-  usageTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+  statsRow: {
+    flexDirection: "row",
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.large,
+    padding: PADDING.card.horizontal,
+    marginBottom: PADDING.content.vertical,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statNumber: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
-    marginBottom: 8,
+    marginBottom: GAPS.small,
   },
-  usageText: {
-    fontSize: 14,
+  statLabel: {
+    fontSize: FONT_SIZES.sm,
     color: "#666",
-    marginBottom: 4,
+    textAlign: "center",
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
-    marginBottom: 16,
+    marginBottom: PADDING.content.horizontal,
+  },
+  settingItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginBottom: GAPS.small,
+  },
+  settingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: GAPS.medium,
+  },
+  settingText: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#000",
+    marginBottom: GAPS.small,
+  },
+  settingSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: "#666",
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginTop: PADDING.content.vertical,
+    borderWidth: 1,
+    borderColor: "#ff4444",
+  },
+  logoutText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#ff4444",
+    marginLeft: GAPS.small,
   },
 });
