@@ -1,7 +1,7 @@
 // API service for Link Up app
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://linkup-backend-mu.vercel.app/api';
 
 export interface User {
   id: string;

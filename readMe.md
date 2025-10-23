@@ -1,305 +1,311 @@
-# Link Up - Social Activity Platform
+# Link Up - Social Activities App
 
-Link Up is a React Native mobile application built with Expo that connects people for meaningful activities. **We are not a dating platform** - we focus on bringing people together for shared interests and experiences.
+A comprehensive React Native app with Node.js backend for discovering and joining social activities in your area.
 
 ## 🚀 Features
 
-### Core Features
-- **Onboarding Flow**: Simple profile setup with name, location, interests, and languages
-- **Activity Discovery**: Browse and join nearby activities with customizable radius filters
-- **Activity Creation**: Create activities with title, category, description, location, and time
-- **Join Requests**: Accept/reject join requests with a banner interface
-- **In-Activity Chat**: Real-time messaging during activities
-- **Map Integration**: View activity locations and participant positions with Mapbox
-- **Post-Event Feedback**: Capture emotional feedback and ratings after activities
-- **Vibe Check**: Quick wellbeing feedback widget on dashboard
+### Frontend (React Native)
+- **Modern Tab Navigation**: Custom PagerView with smooth animations and gaps
+- **Activity Discovery**: Location-based activity search with filters
+- **Real-time Chat**: Socket.io powered messaging for activity participants
+- **User Profiles**: Comprehensive user management with stats and preferences
+- **Subscription System**: Multiple tiers with Stripe integration
+- **Notifications**: Real-time push notifications
+- **Dark/Light Mode**: Complete theme support
+- **Responsive Design**: Optimized for all screen sizes
 
-### Subscription Tiers
-- **Free**: 3 activities, 10km radius
-- **Silver** ($13.6/month or $10 for 3 months): Unlimited activities, 20km radius
-- **Gold** ($21/month): Unlimited activities, 50km radius, rating system, badge matching
-- **Platinum** ($45/month): Unlimited everything, unlimited radius, trending alerts
+### Backend (Node.js/Express/MongoDB)
+- **RESTful API**: Complete CRUD operations for all entities
+- **Authentication**: JWT-based auth with secure password hashing
+- **Real-time Features**: Socket.io for live chat and notifications
+- **Payment Processing**: Stripe integration for subscriptions
+- **Geospatial Queries**: MongoDB location-based searches
+- **Rate Limiting**: API protection against abuse
+- **Security**: Helmet, CORS, input validation
+- **Comprehensive Testing**: Full API test suite
 
-### Subscription Features
-- Upgrade prompts after 8 days of use
-- Daily activity suggestions after 3 days
-- Server-side enforcement of tier limits
-- Usage tracking and analytics
+## 🛠 Tech Stack
 
-## 📋 Prerequisites
+### Frontend
+- **React Native** - Cross-platform mobile development
+- **Expo Router** - File-based navigation
+- **TypeScript** - Type safety
+- **React Native PagerView** - Custom tab navigation
+- **React Native Safe Area Context** - Safe area handling
+- **React Native Gesture Handler** - Touch interactions
+- **React Native Reanimated** - Smooth animations
 
-- Node.js (v18 or higher)
-- npm or yarn
-- iOS Simulator (for Mac) or Android Emulator
-- Expo CLI: `npm install -g expo-cli`
-- EAS CLI (for custom native builds): `npm install -g eas-cli`
+### Backend
+- **Node.js** - Runtime environment
+- **Express.js** - Web framework
+- **MongoDB** - Database
+- **Mongoose** - ODM
+- **JWT** - Authentication
+- **Stripe** - Payment processing
+- **Socket.io** - Real-time communication
+- **Bcrypt** - Password hashing
 
-## 🛠️ Installation
+## 📱 App Screens
 
-1. **Clone the repository**
+1. **Home** - Activity feed with location-based recommendations
+2. **Map** - Interactive map view of nearby activities
+3. **Create** - Create new activities with location and details
+4. **Chat** - Real-time messaging for activity participants
+5. **Profile** - User profile, settings, and subscription management
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js (v16 or higher)
+- MongoDB (local or cloud)
+- Expo CLI
+- iOS Simulator or Android Emulator
+
+### Backend Setup
+
+1. **Navigate to backend directory**
    ```bash
-   cd "/Users/yelekachi/Desktop/Link Up"
+   cd backend
    ```
 
 2. **Install dependencies**
    ```bash
-   npm ci
+   npm install
    ```
 
-3. **Configure Mapbox (Required)**
-   - Get a Mapbox access token from https://account.mapbox.com/
-   - Update `app.json` with your token:
-     ```json
-     {
-       "plugins": [
-         ["@rnmapbox/maps", {
-           "RNMapboxMapsDownloadToken": "YOUR_TOKEN_HERE"
-         }]
-       ]
-     }
-     ```
-   - Update `app/(tabs)/map.tsx` with your token:
-     ```javascript
-     MapboxGL.setAccessToken('YOUR_TOKEN_HERE');
-     ```
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-## 🏃 Running the App
+4. **Start MongoDB**
+   ```bash
+   # Using Docker
+   docker run -d -p 27017:27017 --name mongodb mongo:latest
+   
+   # Or install MongoDB locally
+   ```
 
-### Development
-
-**Start Expo Dev Server:**
+5. **Run setup script**
 ```bash
-npm start
+   chmod +x ../setup-backend.sh
+   ../setup-backend.sh
 ```
 
-**Run on specific platform:**
+6. **Start the server**
 ```bash
-npm run ios      # iOS Simulator
-npm run android  # Android Emulator
-npm run web      # Web browser
+   npm run dev
+   ```
+
+### Frontend Setup
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Start the development server**
+```bash
+   npx expo start
 ```
 
-### Testing
+3. **Run on device/simulator**
+```bash
+   # iOS
+   npx expo start --ios
+   
+   # Android
+   npx expo start --android
+   ```
 
-**Run all tests:**
+## 🧪 Testing
+
+### Backend API Tests
+```bash
+cd backend
+node ../test-api.js
+```
+
+### Frontend Tests
 ```bash
 npm test
 ```
 
-**Run specific test suite:**
-```bash
-npm test -- --testPathPattern=dashboard.spec
-npm test -- --testPathPattern=activity.spec
-npm test -- --testPathPattern=chat.spec
-npm test -- --testPathPattern=subscription.spec
-npm test -- --testPathPattern=feedback.spec
-npm test -- --testPathPattern=appflow.spec
-```
+## 📊 Database Models
 
-**Run tests with coverage:**
-```bash
-npm test -- --coverage
-```
+### User
+- Personal information and preferences
+- Subscription tier and stats
+- Location data and activity history
 
-### Build for Production
+### Activity
+- Activity details and location
+- Participants and join requests
+- Status tracking and timestamps
 
-**EAS Build (Recommended):**
-```bash
-# First time setup
-eas build:configure
+### Chat
+- Activity-based chat rooms
+- Messages with read receipts
+- Participant management
 
-# iOS build
-eas build --platform ios
+### Notification
+- User notifications
+- Different types (join requests, messages, etc.)
+- Read status and priority
 
-# Android build
-eas build --platform android
-```
+### Subscription
+- Stripe integration
+- Billing history
+- Usage tracking and limits
 
-## 📁 Project Structure
+## 🔐 Authentication
 
-```
-Link Up/
-├── app/                    # Expo Router pages
-│   ├── (tabs)/            # Tab navigation screens
-│   │   ├── index.tsx      # Home screen
-│   │   ├── explore.tsx    # Activity dashboard
-│   │   ├── profile.tsx    # Subscription management
-│   │   ├── chat.tsx       # Chat screen
-│   │   └── map.tsx        # Map view
-│   ├── api/               # API routes
-│   │   ├── events+api.ts
-│   │   ├── feedback+api.ts
-│   │   └── subscription+api.ts
-│   ├── onboarding.tsx     # Onboarding flow
-│   └── _layout.tsx        # Root layout
-├── components/            # Reusable components
-│   ├── ActivityCard.jsx
-│   ├── RequestBanner.jsx
-│   ├── MapView.jsx
-│   ├── ChatBox.jsx
-│   ├── FeedbackModal.jsx
-│   ├── VibeCheck.jsx
-│   ├── SubscriptionTier.jsx
-│   └── UpgradePrompt.jsx
-├── contexts/              # React contexts
-│   └── SubscriptionContext.tsx
-├── data/                  # Data layer
-│   ├── store.js          # In-memory data store
-│   └── subscriptionTiers.js
-├── __tests__/            # Test suites
-│   └── screens/
-│       ├── dashboard.spec.jsx
-│       ├── activity.spec.jsx
-│       ├── chat.spec.jsx
-│       ├── subscription.spec.jsx
-│       ├── feedback.spec.jsx
-│       └── appflow.spec.jsx
-└── assets/               # Static assets
-```
+The app uses JWT-based authentication with the following features:
+- Secure password hashing with bcrypt
+- Token-based session management
+- Protected routes and API endpoints
+- User profile management
+- Password change functionality
 
-## 🎨 Design System
+## 💳 Subscription System
 
-### Color Palette (Monochrome Only)
-- **Black**: `#000` - Primary actions, text
-- **Dark Gray**: `#333` - Secondary text
-- **Medium Gray**: `#999` - Disabled states, placeholders
-- **White**: `#FFF` - Backgrounds, inverted text
+### Tiers
+- **Free**: 3 activities/month, 10km radius
+- **Silver**: Unlimited activities, 20km radius, priority support
+- **Gold**: Unlimited activities, 50km radius, advanced features
+- **Platinum**: Unlimited everything, premium support
 
-### Typography
-- Headings: System font, bold (600-700)
-- Body: System font, regular (400-500)
-- Sizes: 12-28px
+### Payment Processing
+- Stripe integration for secure payments
+- Webhook handling for subscription updates
+- Billing history and invoice management
+- Automatic subscription renewals
 
-### Components
-All components follow minimalistic monochrome design with:
-- Simple borders and shadows
-- Clean padding and spacing
-- No gradients or bright colors
-- Accessible contrast ratios
+## 🌍 Location Services
 
-## 🧪 Testing Strategy (TDD)
+- Geospatial queries for nearby activities
+- Radius-based filtering
+- Location-based recommendations
+- Address geocoding and reverse geocoding
 
-The project follows Test-Driven Development:
+## 💬 Real-time Features
 
-1. **Write Failing Tests**: Tests are written before implementation
-2. **Implement Features**: Build features to make tests pass
-3. **Refactor**: Improve code while keeping tests green
+- Live chat for activity participants
+- Real-time notifications
+- Online/offline status
+- Message read receipts
 
-### Test Coverage
-- ✅ Dashboard rendering and filtering
-- ✅ Activity creation and join flows
-- ✅ Request banner accept/reject
-- ✅ Chat messaging
-- ✅ Feedback modal submission
-- ✅ Subscription tier enforcement
-- ✅ Integration tests for complete flows
+## 🔔 Notifications
 
-## 🔑 Key Features Implementation
+- Join request notifications
+- Activity reminders
+- New message alerts
+- Achievement notifications
+- Push notification support
 
-### 1. Activity Lifecycle
-```
-Create → Join Request → Accept/Reject → Map View → Chat → Feedback
-```
+## 🎨 UI/UX Features
 
-### 2. Subscription Enforcement
-- Free tier: Max 3 activities, 10km radius
-- Paid tiers: Unlimited or extended limits
-- Server-side validation on event creation
+- Custom tab navigation with animations
+- Smooth page transitions
+- Responsive design
+- Dark/light mode support
+- Gesture-based interactions
+- Loading states and error handling
 
-### 3. Analytics
-- Active user tracking
-- Join count metrics
-- Feedback collection
+## 📱 Platform Support
 
-## 🚧 Data Storage
+- iOS (iPhone/iPad)
+- Android (Phone/Tablet)
+- Web (PWA support)
+- Cross-platform compatibility
 
-**Current**: In-memory JSON store (`data/store.js`)
-**TODO**: Migrate to proper database (Firebase, Supabase, or PostgreSQL)
+## 🚀 Deployment
 
-To replace the in-memory store:
-1. Create database schema
-2. Update `data/store.js` to use database client
-3. Update API routes to use async database calls
-4. Maintain same API interface for compatibility
+### Backend
+- Deploy to Heroku, AWS, or DigitalOcean
+- Set up MongoDB Atlas for production
+- Configure environment variables
+- Set up Stripe webhooks
 
-## 🔄 Git Workflow
+### Frontend
+- Build for iOS App Store
+- Build for Google Play Store
+- Deploy as PWA
+- Configure push notifications
 
-**Commit Message Format:**
-```
-type(scope): description
+## 📈 Performance
 
-- Detail 1
-- Detail 2
-```
+- Optimized database queries
+- Image compression and caching
+- Lazy loading and pagination
+- Efficient state management
+- Memory leak prevention
 
-**Types**: `feat`, `fix`, `test`, `refactor`, `docs`, `chore`
+## 🔒 Security
 
-**Example commits:**
-- `test(ui): add failing tests for dashboard and activity`
-- `feat(activity): implement event create + join`
-- `feat(linkup): implement core linkup features + tests (all green)`
+- JWT token authentication
+- Password hashing with bcrypt
+- Rate limiting and DDoS protection
+- Input validation and sanitization
+- CORS configuration
+- Helmet security headers
 
-## 📱 Platform-Specific Notes
+## 📝 API Documentation
 
-### iOS
-- Requires Mac with Xcode
-- Location permissions configured in `app.json`
-- Mapbox requires custom native build (EAS)
+### Authentication Endpoints
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login user
+- `GET /api/auth/me` - Get current user
+- `PUT /api/auth/profile` - Update profile
 
-### Android
-- Location permissions in `app.json`
-- Edge-to-edge display enabled
-- Mapbox requires custom native build (EAS)
+### Activity Endpoints
+- `GET /api/activities` - Get activities with filters
+- `POST /api/activities` - Create activity
+- `PUT /api/activities/:id` - Update activity
+- `DELETE /api/activities/:id` - Delete activity
 
-### Web
-- Limited Mapbox functionality
-- AsyncStorage falls back to localStorage
-- Some native features unavailable
+### Chat Endpoints
+- `GET /api/chat` - Get user's chats
+- `POST /api/chat/:id/messages` - Send message
+- `GET /api/chat/:id/messages` - Get messages
 
-## 🐛 Troubleshooting
-
-**Tests failing with "act(...)" warnings:**
-- Wrap async updates in `act()` or use `waitFor()`
-- Ensure mocks return promises properly
-
-**Mapbox not displaying:**
-- Verify access token is correct
-- Run custom EAS build (Mapbox not supported in Expo Go)
-- Check network connectivity
-
-**API routes not found:**
-- Ensure Expo Router is configured correctly
-- Check `app.json` for router configuration
-- Restart dev server
-
-## 📄 License
-
-MIT
+### Subscription Endpoints
+- `GET /api/subscription/tiers` - Get subscription tiers
+- `POST /api/subscription/create` - Create subscription
+- `PUT /api/subscription/update` - Update subscription
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Write tests first (TDD)
-4. Implement feature
-5. Ensure all tests pass
-6. Submit pull request
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
-## 📞 Support
+## 📄 License
 
-For issues or questions:
-- Check existing issues on GitHub
-- Review test files for usage examples
-- Consult Expo and React Native documentation
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+For support and questions:
+- Create an issue on GitHub
+- Check the documentation
+- Review the API tests
+- Contact the development team
+
+## 🎯 Roadmap
+
+- [ ] Push notifications
+- [ ] Video chat integration
+- [ ] Advanced analytics
+- [ ] Multi-language support
+- [ ] Offline mode
+- [ ] Social media integration
+- [ ] Activity recommendations
+- [ ] User verification system
 
 ---
 
-**Built with:**
-- Expo ~53.0
-- React Native 0.79
-- Mapbox Maps
-- Jest + React Native Testing Library
-- TypeScript
-- AsyncStorage
-
-**Mission**: Connect people for meaningful activities, not dating. Build community through shared experiences.
+**Built with ❤️ by the Link Up Team**

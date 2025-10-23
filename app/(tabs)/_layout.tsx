@@ -1,5 +1,5 @@
 // app/(tabs)/_layout.tsx
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   TouchableOpacity,
@@ -14,6 +14,7 @@ import {
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useApi } from "@/contexts/ApiContext";
 
 // Import each screen statically
 import HomeScreen from "./index";
@@ -91,6 +92,32 @@ export default function TabLayout() {
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isAuthenticated, isGuest, isLoading } = useApi();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !isGuest) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isGuest, isLoading, router]);
+
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? "#0b0b0b" : "#fff" }]}>
+        <View style={styles.loadingContainer}>
+          <FontAwesome name="users" size={48} color={isDark ? "#fff" : "#000"} />
+          <Text style={[styles.loadingText, { color: isDark ? "#fff" : "#000" }]}>Link Up</Text>
+          <Text style={[styles.loadingSubtext, { color: isDark ? "#ccc" : "#666" }]}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Don't render if not authenticated
+  if (!isAuthenticated && !isGuest) {
+    return null;
+  }
 
   const TOTAL_GAP = 12; // total gap between pages
   const availableScreens = screens.filter(screen => screen.component !== null);
@@ -187,6 +214,20 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1,
     width: '100%',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  loadingSubtext: {
+    fontSize: 16,
+    marginTop: 8,
   },
   scrollView: {
     flex: 1,
