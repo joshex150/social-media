@@ -2,7 +2,16 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 export default function ActivityCard({ activity, onJoin, onView }) {
-  const { id, title, category, distance, participants, maxParticipants, startTime } = activity;
+  const { _id: id, title, category, participants, maxParticipants, date } = activity;
+  
+  // Calculate participant count
+  const participantCount = Array.isArray(participants) ? participants.length : 0;
+  
+  // Calculate distance (mock for now - would need user location)
+  // Use a stable hash of the activity ID to generate consistent distance
+  const distance = Math.abs(id.split('').reduce((hash, char) => {
+    return hash + char.charCodeAt(0);
+  }, 0)) % 10 + 1; // Mock distance between 1-10km
   
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -19,9 +28,9 @@ export default function ActivityCard({ activity, onJoin, onView }) {
       <View style={styles.details}>
         <Text style={styles.distance} testID="activity-distance">{distance}km</Text>
         <Text style={styles.participants}>
-          {participants}/{maxParticipants} participants
+          {participantCount}/{maxParticipants} participants
         </Text>
-        <Text style={styles.time}>{formatTime(startTime)}</Text>
+        <Text style={styles.time}>{formatTime(date)}</Text>
       </View>
 
       <View style={styles.actions}>

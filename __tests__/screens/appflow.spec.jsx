@@ -214,7 +214,7 @@ describe('App Flow Integration', () => {
 
   it('handles activity lifecycle with chat and feedback', async () => {
     const mockMessages = [
-      { id: '1', text: 'Hello!', sender: 'Alice', timestamp: '2024-01-15T09:00:00Z' }
+      { id: '1', text: 'Hello!', sender: 'Alice', timestamp: '2025-01-15T09:00:00Z' }
     ];
 
     global.fetch

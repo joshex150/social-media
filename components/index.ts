@@ -1,2 +1,4 @@
 import { useUserLocation } from "./location/location";
-export { useUserLocation };
+import RefreshLoader from "./RefreshLoader";
+
+export { useUserLocation, RefreshLoader };

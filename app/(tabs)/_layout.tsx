@@ -1,5 +1,5 @@
 // app/(tabs)/_layout.tsx
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import {
   View,
   TouchableOpacity,
@@ -8,8 +8,9 @@ import {
   Animated,
   Platform,
   useColorScheme,
+  Dimensions,
+  ScrollView,
 } from "react-native";
-import PagerView from "react-native-pager-view";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -19,6 +20,8 @@ import HomeScreen from "./index";
 import ProfileScreen from "./profile";
 import ChatScreen from "./chat";
 import MapScreen from "./map";
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const screens = [
   {
@@ -54,7 +57,7 @@ function CustomTabBar({ currentIndex, onTabPress, insets }: any) {
       ]}
     >
       {screens.map((screen, index) => {
-        // Adjust currentIndex for the create tab since it's not in the PagerView
+        // Adjust currentIndex for the create tab since it's not in the view
         const adjustedIndex = screen.name === "create" ? -1 : 
           screens.filter(s => s.component !== null).findIndex(s => s.name === screen.name);
         const isFocused = currentIndex === adjustedIndex;
@@ -81,114 +84,121 @@ function CustomTabBar({ currentIndex, onTabPress, insets }: any) {
 }
 
 export default function TabLayout() {
-  const position = useRef(new Animated.Value(0)).current;
-  const offset = useRef(new Animated.Value(0)).current;
-  const indexAnim = Animated.add(position, offset);
-  const pagerRef = useRef<PagerView | null>(null);
-  const [page, setPage] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const TOTAL_GAP = 24; // total gap between pages
-  const HALF_GAP = TOTAL_GAP / 2;
+  const TOTAL_GAP = 12; // total gap between pages
+  const availableScreens = screens.filter(screen => screen.component !== null);
 
   const gapColor = isDark ? "#111213" : "#e6e6e6";
   const pageColor = isDark ? "#0b0b0b" : "#fff";
 
-  const onPageScroll = Animated.event(
-    [{ nativeEvent: { position: position, offset: offset } }],
-    { useNativeDriver: false }
-  );
-
-  const handlePageSelected = (e: any) => {
-    setPage(e.nativeEvent.position);
-  };
-
-  const handleTabPress = (index: number) => {
+  const handleTabPress = useCallback((index: number) => {
     const screen = screens[index];
     if (screen.name === "create") {
-      // Navigate to create activity page instead of changing tab
       router.push("/create-activity");
       return;
     }
     
-    // Map the tab index to the PagerView index (excluding create tab)
-    const pagerIndex = screens.filter(s => s.component !== null).findIndex(s => s.name === screen.name);
-    if (pagerIndex !== -1) {
-      pagerRef.current?.setPage(pagerIndex);
-      setPage(pagerIndex);
+    const screenIndex = availableScreens.findIndex(s => s.name === screen.name);
+    if (screenIndex !== -1) {
+      setCurrentIndex(screenIndex);
+      scrollViewRef.current?.scrollTo({
+        x: screenIndex * (screenWidth + TOTAL_GAP),
+        animated: true,
+      });
     }
-  };
+  }, [availableScreens, router]);
+
+  const handleScroll = useCallback((event: any) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const pageWidth = screenWidth + TOTAL_GAP;
+    const newIndex = Math.round(contentOffsetX / pageWidth);
+    
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < availableScreens.length) {
+      setCurrentIndex(newIndex);
+    }
+  }, [currentIndex, availableScreens.length]);
+
+  const handleScrollBeginDrag = useCallback(() => {
+    setIsScrolling(true);
+  }, []);
+
+  const handleScrollEndDrag = useCallback(() => {
+    setIsScrolling(false);
+  }, []);
+
+  const renderScreen = useCallback((screen: any, index: number) => {
+    const ScreenComponent = screen.component;
+    
+    return (
+      <View
+        key={screen.name}
+        style={[
+          styles.screenContainer,
+          {
+            backgroundColor: pageColor,
+            width: screenWidth,
+            marginRight: index < availableScreens.length - 1 ? TOTAL_GAP : 0,
+            borderTopLeftRadius: 42,
+            borderTopRightRadius: 42,
+          },
+        ]}
+      >
+        <ScreenComponent />
+      </View>
+    );
+  }, [pageColor, availableScreens.length]);
 
   return (
-    <View style={[styles.container, { backgroundColor: gapColor }]}>
-      <PagerView
-        ref={pagerRef}
-        style={styles.pager}
-        initialPage={0}
-        onPageScroll={onPageScroll}
-        onPageSelected={handlePageSelected}
-        pageMargin={Platform.OS === "android" ? TOTAL_GAP : 0}
+    <View style={[styles.container, { backgroundColor: gapColor, width: '100%' }]}>
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        pagingEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
+        scrollEventThrottle={16}
+        snapToInterval={screenWidth + TOTAL_GAP}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        bounces={false}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
       >
-        {screens.filter(screen => screen.component !== null).map((screen, idx) => {
-          const distance = indexAnim.interpolate({
-            inputRange: [idx - 1, idx, idx + 1],
-            outputRange: [1, 0, 1],
-            extrapolate: "clamp",
-          });
+        {availableScreens.map((screen, index) => renderScreen(screen, index))}
+      </ScrollView>
 
-          // padding for peek effect
-          const padding = distance.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, HALF_GAP],
-            extrapolate: "clamp",
-          });
-
-          // animated border radius (0 when centered)
-          const borderRadius = distance.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 50], // adjust as needed
-            extrapolate: "clamp",
-          });
-
-          const ScreenComponent = screen.component;
-
-          return (
-            <Animated.View
-              key={screen.name}
-              style={{
-                flex: 1,
-                paddingHorizontal: padding,
-              }}
-            >
-              <Animated.View
-                style={[
-                  styles.pageInner,
-                  {
-                    backgroundColor: pageColor,
-                    borderRadius,
-                  },
-                ]}
-              >
-                <ScreenComponent />
-              </Animated.View>
-            </Animated.View>
-          );
-        })}
-      </PagerView>
-
-      <CustomTabBar currentIndex={page} onTabPress={handleTabPress} insets={insets} />
+      <View style={{ width: '100%' }}>
+        <CustomTabBar currentIndex={currentIndex} onTabPress={handleTabPress} insets={insets} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  pager: { flex: 1 },
-  pageInner: {
+  container: { 
     flex: 1,
+    width: '100%',
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  screenContainer: {
+    flex: 1,
+    height: '100%',
     overflow: "hidden",
     ...Platform.select({
       ios: {
@@ -208,6 +218,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderTopWidth: 1,
+    width: '100%',
   },
   tabItem: {
     alignItems: "center",

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function VibeCheck({ onFeedback }) {
   const [selected, setSelected] = useState(null);
+  const [isVisible, setIsVisible] = useState(true);
 
   const vibes = [
     { id: 'happy', icon: 'smile-o', label: 'Happy' },
@@ -11,12 +13,51 @@ export default function VibeCheck({ onFeedback }) {
     { id: 'sad', icon: 'frown-o', label: 'Sad' },
   ];
 
+  // Check if VibeCheck should be visible on component mount
+  useEffect(() => {
+    checkVisibility();
+  }, []);
+
+  const checkVisibility = async () => {
+    try {
+      const lastAnswered = await AsyncStorage.getItem('vibeCheckLastAnswered');
+      if (lastAnswered) {
+        const lastAnsweredTime = parseInt(lastAnswered);
+        const currentTime = Date.now();
+        const timeDifference = currentTime - lastAnsweredTime;
+        const sixtyMinutes = 60 * 60 * 1000; // 60 minutes in milliseconds
+        
+        if (timeDifference < sixtyMinutes) {
+          setIsVisible(false);
+        }
+      }
+    } catch (error) {
+      console.log('Error checking VibeCheck visibility:', error);
+    }
+  };
+
   const handleSelect = async (vibe) => {
     setSelected(vibe);
+    
+    // Store the current timestamp when answered
+    try {
+      await AsyncStorage.setItem('vibeCheckLastAnswered', Date.now().toString());
+    } catch (error) {
+      console.log('Error storing VibeCheck timestamp:', error);
+    }
+    
+    // Hide the component immediately after selection
+    setIsVisible(false);
+    
     if (onFeedback) {
       await onFeedback(vibe);
     }
   };
+
+  // Don't render if not visible
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <View style={styles.container} testID="vibe-check">

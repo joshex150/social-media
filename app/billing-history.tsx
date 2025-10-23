@@ -12,65 +12,65 @@ export default function BillingHistoryScreen() {
 
   const periods = [
     { id: "all", title: "All Time" },
-    { id: "2024", title: "2024" },
-    { id: "2023", title: "2023" },
+    { id: "2025", title: "2025" },
+    { id: "2025", title: "2025" },
     { id: "2022", title: "2022" }
   ];
 
   const billingHistory = [
     {
       id: "1",
-      date: "2024-01-15",
+      date: "2025-01-15",
       description: "Silver Plan - Monthly",
       amount: 9.99,
       status: "paid",
       method: "Visa •••• 4242",
-      invoiceId: "INV-2024-001"
+      invoiceId: "INV-2025-001"
     },
     {
       id: "2",
-      date: "2023-12-15",
+      date: "2025-12-15",
       description: "Silver Plan - Monthly",
       amount: 9.99,
       status: "paid",
       method: "Visa •••• 4242",
-      invoiceId: "INV-2023-012"
+      invoiceId: "INV-2025-012"
     },
     {
       id: "3",
-      date: "2023-11-15",
+      date: "2025-11-15",
       description: "Silver Plan - Monthly",
       amount: 9.99,
       status: "paid",
       method: "Visa •••• 4242",
-      invoiceId: "INV-2023-011"
+      invoiceId: "INV-2025-011"
     },
     {
       id: "4",
-      date: "2023-10-15",
+      date: "2025-10-15",
       description: "Free Plan",
       amount: 0.00,
       status: "paid",
       method: "N/A",
-      invoiceId: "INV-2023-010"
+      invoiceId: "INV-2025-010"
     },
     {
       id: "5",
-      date: "2023-09-15",
+      date: "2025-09-15",
       description: "Gold Plan - Monthly",
       amount: 19.99,
       status: "failed",
       method: "Mastercard •••• 5555",
-      invoiceId: "INV-2023-009"
+      invoiceId: "INV-2025-009"
     },
     {
       id: "6",
-      date: "2023-08-15",
+      date: "2025-08-15",
       description: "Gold Plan - Monthly",
       amount: 19.99,
       status: "paid",
       method: "Mastercard •••• 5555",
-      invoiceId: "INV-2023-008"
+      invoiceId: "INV-2025-008"
     }
   ];
 

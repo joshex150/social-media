@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, RefreshControl, Dimensions } from "react-native";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useRouter } from "expo-router";
@@ -6,29 +6,12 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ActivityCard from "@/components/ActivityCard";
 import VibeCheck from "@/components/VibeCheck";
 import RequestBanner from "@/components/RequestBanner";
+import RefreshLoader from "@/components/RefreshLoader";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useApi } from "@/contexts/ApiContext";
+import type { Activity, JoinRequest, Notification } from "@/services/api";
 
 const { width } = Dimensions.get('window');
-
-interface Activity {
-  id: string;
-  title: string;
-  category: string;
-  distance: string;
-  participants: number;
-  maxParticipants: number;
-  startTime: number;
-}
-
-interface JoinRequest {
-  id: string;
-  userId: string;
-  userName: string;
-  activityId: string;
-  activityTitle: string;
-  message: string;
-  timestamp: number;
-}
 
 interface Stats {
   totalActivities: number;
@@ -37,202 +20,280 @@ interface Stats {
   thisWeekActivities: number;
 }
 
-interface Notification {
-  id: string;
-  type: 'join_request' | 'activity_reminder' | 'new_activity' | 'achievement';
-  title: string;
-  message: string;
-  timestamp: number;
-  read: boolean;
-}
-
 export default function HomeScreen() {
-  const [upcomingActivities, setUpcomingActivities] = useState<Activity[]>([]);
-  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
-  const [stats, setStats] = useState<Stats>({ totalActivities: 0, totalConnections: 0, streakDays: 0, thisWeekActivities: 0 });
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Stats>({
+    totalActivities: 0,
+    totalConnections: 0,
+    streakDays: 0,
+    thisWeekActivities: 0
+  });
   const [refreshing, setRefreshing] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [refreshProgress, setRefreshProgress] = useState(0);
+  const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { 
+    user, 
+    activities, 
+    notifications, 
+    joinRequests,
+    loadActivities, 
+    loadNotifications, 
+    refreshData,
+    joinActivity,
+    respondToJoinRequest
+  } = useApi();
 
-  useEffect(() => {
-    loadHomeData();
-    
-    // Update time every minute
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-    
-    return () => clearInterval(timeInterval);
-  }, []);
+  // Load data from API
+  const loadData = async () => {
+    await Promise.all([
+      loadActivities(),
+      loadNotifications(),
+    ]);
 
-  const loadHomeData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load upcoming activities
-      const activitiesResponse = await fetch('/api/events?upcoming=true&limit=5');
-      const activitiesData = await activitiesResponse.json();
-      setUpcomingActivities(activitiesData.activities || []);
-
-      // Load join requests
-      const requestsResponse = await fetch('/api/events/requests');
-      const requestsData = await requestsResponse.json();
-      setJoinRequests(requestsData.requests || []);
-
-      // Load user stats
-      const statsResponse = await fetch('/api/user/stats');
-      const statsData = await statsResponse.json();
-      setStats(statsData.stats || { totalActivities: 0, totalConnections: 0, streakDays: 0, thisWeekActivities: 0 });
-
-      // Load notifications
-      const notificationsResponse = await fetch('/api/notifications');
-      const notificationsData = await notificationsResponse.json();
-      setNotifications(notificationsData.notifications || []);
-    } catch (error) {
-      console.error('Failed to load home data:', error);
-    } finally {
-      setLoading(false);
+    // Calculate stats from current user data
+    if (user) {
+      setStats({
+        totalActivities: user.stats.activitiesCreated + user.stats.activitiesJoined,
+        totalConnections: user.stats.connectionsMade,
+        streakDays: user.stats.streakDays,
+        thisWeekActivities: Math.floor(Math.random() * 5) + 3 // Random for demo
+      });
     }
   };
 
-  const onRefresh = async () => {
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadHomeData();
-    setRefreshing(false);
-  };
+    setRefreshProgress(0);
+    
+    // Simulate progress updates
+    const progressInterval = setInterval(() => {
+      setRefreshProgress(prev => {
+        if (prev >= 1) {
+          clearInterval(progressInterval);
+          return 1;
+        }
+        return prev + 0.1;
+      });
+    }, 100);
+    
+    await refreshData();
+    
+    setTimeout(() => {
+      setRefreshing(false);
+      setRefreshProgress(0);
+      clearInterval(progressInterval);
+    }, 2000);
+  }, [refreshData]);
 
   const handleJoinRequest = async (requestId: string, action: 'accept' | 'reject') => {
     try {
-      const response = await fetch(`/api/events/requests/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-
-      if (response.ok) {
-        Alert.alert('Success', `Request ${action}ed successfully!`);
-        loadHomeData(); // Refresh data
+      const result = await respondToJoinRequest(requestId, action);
+      if (result.success) {
+        Alert.alert(
+          'Join Request',
+          `Request ${action === 'accept' ? 'accepted' : 'rejected'} successfully!`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to process request');
       }
     } catch (error) {
-      Alert.alert('Error', `Failed to ${action} request`);
+      Alert.alert('Error', 'Failed to process request');
     }
   };
 
   const handleVibeFeedback = async (vibe: string) => {
-    try {
-      await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'vibe', emotion: vibe }),
-      });
-    } catch (error) {
-      console.error('Failed to submit vibe feedback:', error);
-    }
-  };
-
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
-
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    return `${Math.floor(diffInHours / 24)}d ago`;
+    setVibeFeedback(vibe);
+    Alert.alert('Thank you!', 'Your feedback has been recorded.');
   };
 
   const getUnreadNotificationsCount = () => {
-    return notifications.filter(n => !n.read).length;
+    return notifications?.filter(notification => !notification.isRead).length || 0;
   };
 
-  return (
-    <ScrollView 
-      style={[styles.container, safeArea.content]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  // Filter upcoming activities
+  const upcomingActivities = useMemo(() => {
+    if (!activities) return [];
+    const now = new Date();
+    return activities.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return activityDate > now && activity.status === 'upcoming';
+    });
+  }, [activities]);
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+
+  const handleScroll = useCallback((event: any) => {
+    const { contentOffset, contentInset, layoutMeasurement } = event.nativeEvent;
+    const pullDistance = -contentOffset.y - contentInset.top;
+    const refreshThreshold = 100; // Distance to pull before refresh triggers
+
+    if (!refreshing && pullDistance > 0) {
+      const progress = Math.min(pullDistance / refreshThreshold, 1);
+      setRefreshProgress(progress);
+    }
+  }, [refreshing]);
+
+  const handleJoinActivity = useCallback(async (activityId: string) => {
+    try {
+      const result = await joinActivity(activityId);
+      if (result.success) {
+        Alert.alert('Success', 'You have joined the activity!');
+      } else {
+        Alert.alert('Error', result.error || 'Failed to join activity');
       }
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Enhanced Header */}
+    } catch (error) {
+      Alert.alert('Error', 'Failed to join activity');
+    }
+  }, [joinActivity]);
+
+  const handleViewActivity = useCallback((activityId: string) => {
+    router.push(`/activity/${activityId}`);
+  }, [router]);
+
+  return (
+    <View style={styles.container}>
+      {/* Custom Refresh Loader - Only show when actively refreshing */}
+      {refreshing && (
+        <View style={styles.refreshLoaderContainer}>
+          <RefreshLoader
+            refreshing={refreshing}
+            progress={refreshProgress}
+            title=""
+            refreshingTitle="Refreshing..."
+            color="#000"
+            size={20}
+            showProgress={true}
+            animationType="spin"
+          />
+        </View>
+      )}
+      
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="transparent"
+            colors={['transparent']}
+            progressBackgroundColor="transparent"
+          />
+        }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+      {/* Header */}
       <View style={[styles.header, safeArea.header]}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.title}>Welcome back!</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => {}}
-          >
-            <View style={styles.notificationIcon}>
-              <FontAwesome name="bell" size={20} color="#000" />
-              {getUnreadNotificationsCount() > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {getUnreadNotificationsCount()}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Welcome back!</Text>
         </View>
-        <Text style={styles.subtitle}>Connect with people around you</Text>
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={() => router.push('/system-notifications')}
+        >
+          <View style={styles.notificationButtonIcon}>
+            <FontAwesome name="bell" size={20} color="#000" />
+            {getUnreadNotificationsCount() > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {getUnreadNotificationsCount()}
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
+      <Text style={styles.subtitle}>Connect with people around you</Text>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Redesigned */}
       <View style={styles.statsContainer}>
-        <View style={styles.statsRow}>
-          <View style={[styles.statsCard, styles.statsCardPrimary]}>
-            <View style={styles.statsIconContainer}>
-              <FontAwesome name="calendar" size={20} color="#000" />
+        {/* Main Stats Row - Horizontal Cards */}
+        <View style={styles.mainStatsRow}>
+          <View style={[styles.mainStatsCard, styles.primaryCard]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.mainStatsIconContainer}>
+                <FontAwesome name="calendar" size={24} color="#fff" />
+              </View>
+              <View style={styles.cardBadge}>
+                <Text style={styles.badgeText}>Total</Text>
+              </View>
             </View>
-            <Text style={[styles.statsNumber, styles.statsNumberWhite]}>{stats.totalActivities}</Text>
-            <Text style={[styles.statsLabel, styles.statsLabelWhite]}>Activities</Text>
+            <View style={styles.cardContent}>
+              <Text style={styles.mainStatsNumber}>{stats.totalActivities}</Text>
+              <Text style={styles.mainStatsLabel}>Activities</Text>
+            </View>
           </View>
-          <View style={[styles.statsCard, styles.statsCardSecondary]}>
-            <View style={[styles.statsIconContainer, styles.statsIconSecondary]}>
-              <FontAwesome name="users" size={20} color="#000" />
+          
+          <View style={[styles.mainStatsCard, styles.secondaryCard]}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.mainStatsIconContainer, { backgroundColor: "#e9ecef" }]}>
+                <FontAwesome name="users" size={24} color="#000" />
+              </View>
+              <View style={[styles.cardBadge, { backgroundColor: "#e9ecef" }]}>
+                <Text style={[styles.badgeText, { color: "#000" }]}>Network</Text>
+              </View>
             </View>
-            <Text style={styles.statsNumber}>{stats.totalConnections}</Text>
-            <Text style={styles.statsLabel}>Connections</Text>
+            <View style={styles.cardContent}>
+              <Text style={styles.mainStatsNumberSecondary}>{stats.totalConnections}</Text>
+              <Text style={styles.mainStatsLabelSecondary}>Connections</Text>
+            </View>
           </View>
         </View>
-        <View style={styles.statsRow}>
-          <View style={[styles.statsCard, styles.statsCardAccent]}>
-            <View style={[styles.statsIconContainer, styles.statsIconAccent]}>
-              <FontAwesome name="fire" size={20} color="#000" />
+
+        {/* Secondary Stats Row - Compact Cards */}
+        {/* <View style={styles.secondaryStatsRow}>
+          <View style={[styles.secondaryStatsCard, styles.streakCard]}>
+            <View style={styles.secondaryIconContainer}>
+              <FontAwesome name="fire" size={18} color="#000" />
             </View>
-            <Text style={styles.statsNumber}>{stats.streakDays}</Text>
-            <Text style={styles.statsLabel}>Day Streak</Text>
-          </View>
-          <View style={[styles.statsCard, styles.statsCardSuccess]}>
-            <View style={[styles.statsIconContainer, styles.statsIconSuccess]}>
-              <FontAwesome name="line-chart" size={20} color="#000" />
+            <View style={styles.secondaryContent}>
+              <Text style={styles.secondaryNumber}>{stats.streakDays}</Text>
+              <Text style={styles.secondaryLabel}>Day Streak</Text>
             </View>
-            <Text style={styles.statsNumber}>{stats.thisWeekActivities}</Text>
-            <Text style={styles.statsLabel}>This Week</Text>
           </View>
-        </View>
+          
+          <View style={[styles.secondaryStatsCard, styles.weekCard]}>
+            <View style={styles.secondaryIconContainer}>
+              <FontAwesome name="line-chart" size={18} color="#000" />
+            </View>
+            <View style={styles.secondaryContent}>
+              <Text style={styles.secondaryNumber}>{stats.thisWeekActivities}</Text>
+              <Text style={styles.secondaryLabel}>This Week</Text>
+            </View>
+          </View>
+          
+          <View style={[styles.secondaryStatsCard, styles.achievementCard]}>
+            <View style={styles.secondaryIconContainer}>
+              <FontAwesome name="trophy" size={18} color="#000" />
+            </View>
+            <View style={styles.secondaryContent}>
+              <Text style={styles.secondaryNumber}>12</Text>
+              <Text style={styles.secondaryLabel}>Achievements</Text>
+            </View>
+          </View>
+        </View> */}
       </View>
 
-      {/* Join Requests */}
+      {/* Join Requests Banner */}
       {joinRequests.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Join Requests</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{joinRequests.length}</Text>
-            </View>
-          </View>
+        <View style={styles.requestsContainer}>
+          <Text style={styles.requestsTitle}>Join Requests</Text>
           {joinRequests.slice(0, 2).map((request) => (
             <RequestBanner
               key={request.id}
@@ -242,37 +303,35 @@ export default function HomeScreen() {
             />
           ))}
           {joinRequests.length > 2 && (
-            <TouchableOpacity style={styles.seeAllButton}>
-              <Text style={styles.seeAllText}>View {joinRequests.length - 2} more</Text>
+            <TouchableOpacity style={styles.viewAllRequests}>
+              <Text style={styles.viewAllText}>View All Requests ({joinRequests.length})</Text>
             </TouchableOpacity>
           )}
         </View>
       )}
 
       {/* Vibe Check */}
-      <View style={styles.section}>
-        <VibeCheck onFeedback={handleVibeFeedback} />
-      </View>
+      <VibeCheck onFeedback={handleVibeFeedback} />
 
       {/* Upcoming Activities */}
-      <View style={styles.section}>
+      <View style={styles.activitiesSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming Activities</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.seeAllButton}
             onPress={() => router.push('/explore')}
           >
-            <Text style={styles.seeAllText}>See All</Text>
+            <Text style={styles.seeAllText}>View All</Text>
           </TouchableOpacity>
         </View>
-        
+
         {upcomingActivities.length > 0 ? (
           upcomingActivities.slice(0, 3).map((activity) => (
             <ActivityCard
-              key={activity.id}
+              key={activity._id}
               activity={activity}
-              onJoin={() => console.log('Join activity:', activity.id)}
-              onView={() => router.push(`/activity/${activity.id}`)}
+              onJoin={() => handleJoinActivity(activity._id)}
+              onView={() => handleViewActivity(activity._id)}
             />
           ))
         ) : (
@@ -280,7 +339,7 @@ export default function HomeScreen() {
             <FontAwesome name="bullseye" size={48} color="#ccc" />
             <Text style={styles.emptyTitle}>No upcoming activities</Text>
             <Text style={styles.emptySubtitle}>Check out the Explore tab to find activities</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.emptyActionButton}
               onPress={() => router.push('/explore')}
             >
@@ -291,89 +350,117 @@ export default function HomeScreen() {
       </View>
 
       {/* Recent Notifications */}
-      {notifications.length > 0 && (
-        <View style={styles.section}>
+      {notifications?.length > 0 && (
+        <View style={styles.notificationsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity onPress={() =>{}}>
+            <Text style={styles.sectionTitle}>Recent Notifications</Text>
+            <TouchableOpacity 
+              style={styles.seeAllButton}
+              onPress={() => router.push('/system-notifications')}
+            >
               <Text style={styles.seeAllText}>View All</Text>
             </TouchableOpacity>
           </View>
           {notifications.slice(0, 3).map((notification) => (
-            <TouchableOpacity key={notification.id} style={styles.notificationItem}>
+            <TouchableOpacity key={notification._id} style={styles.notificationItem}>
               <View style={styles.notificationIcon}>
-                <FontAwesome 
+                <FontAwesome
                   name={
-                    notification.type === 'join_request' ? 'user-plus' : 
-                    notification.type === 'activity_reminder' ? 'clock-o' :
-                    notification.type === 'new_activity' ? 'plus-circle' : 'trophy'
-                  } 
-                  size={20} 
-                  color="#000" 
+                    notification.type === 'join_request' ? 'user-plus' :
+                      notification.type === 'activity_reminder' ? 'clock-o' :
+                        notification.type === 'new_activity' ? 'plus-circle' : 'trophy'
+                  }
+                  size={20}
+                  color="#000"
                 />
               </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationTitle}>{notification.title}</Text>
                 <Text style={styles.notificationMessage}>{notification.message}</Text>
-                <Text style={styles.notificationTime}>{formatTime(notification.timestamp)}</Text>
+                <Text style={styles.notificationTime}>{formatTime(notification.createdAt)}</Text>
               </View>
-              {!notification.read && <View style={styles.unreadDot} />}
+              {!notification.isRead && <View style={styles.unreadDot} />}
             </TouchableOpacity>
           ))}
         </View>
       )}
 
-      {/* Bottom Spacing */}
-      <View style={styles.bottomSpacing} />
-    </ScrollView>
+      {/* Quick Actions */}
+      <View style={styles.quickActionsSection}>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => router.push('/create-activity')}
+          >
+            <FontAwesome name="plus" size={24} color="#000" />
+            <Text style={styles.quickActionText}>Create Activity</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => router.push('/explore')}
+          >
+            <FontAwesome name="search" size={24} color="#000" />
+            <Text style={styles.quickActionText}>Find Friends</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  refreshLoaderContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    paddingTop: 20,
+  },
+  contentContainer: {
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
   },
   header: {
-    paddingHorizontal: PADDING.header.horizontal,
-    paddingVertical: PADDING.header.vertical,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  headerTop: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: MARGIN.text.bottom,
+    marginBottom: PADDING.content.vertical,
   },
-  greeting: {
-    fontSize: FONT_SIZES.sm,
-    color: "#666",
-    marginBottom: 2,
+  headerLeft: {
+    flex: 1,
   },
   title: {
-    fontSize: FONT_SIZES.xxxl,
+    fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
   },
   subtitle: {
     fontSize: FONT_SIZES.md,
     color: "#666",
+    marginBottom: PADDING.content.vertical,
   },
   notificationButton: {
-    padding: 8,
+    padding: GAPS.small,
   },
-  notificationIcon: {
+  notificationButtonIcon: {
     position: "relative",
-  },
-  notificationIconText: {
-    fontSize: 24,
   },
   notificationBadge: {
     position: "absolute",
-    top: -4,
-    right: -4,
+    top: -8,
+    right: -8,
     backgroundColor: "#ff4444",
     borderRadius: 10,
     minWidth: 20,
@@ -382,220 +469,252 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   notificationBadgeText: {
+    color: "#fff",
     fontSize: FONT_SIZES.xs,
-    color: "#fff",
     fontWeight: FONT_WEIGHTS.bold,
   },
-  statsContainer: {
-    marginTop: PADDING.content.vertical,
-    paddingHorizontal: PADDING.section.vertical,
-    paddingVertical: PADDING.section.vertical,
-    gap: GAPS.medium,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: GAPS.medium,
-  },
-  statsCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: BORDER_RADIUS.large,
-    padding: PADDING.card.vertical + 4,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statsCardPrimary: {
-    backgroundColor: "#000",
-    borderColor: "#000",
-  },
-  statsCardSecondary: {
-    backgroundColor: "#f8f9fa",
-    borderColor: "#e9ecef",
-  },
-  statsCardAccent: {
-    backgroundColor: "#f1f3f4",
-    borderColor: "#dee2e6",
-  },
-  statsCardSuccess: {
-    backgroundColor: "#f8f9fa",
-    borderColor: "#e9ecef",
-  },
-  statsIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: GAPS.small,
-  },
-  statsIconSecondary: {
-    backgroundColor: "#e9ecef",
-  },
-  statsIconAccent: {
-    backgroundColor: "#dee2e6",
-  },
-  statsIconSuccess: {
-    backgroundColor: "#e9ecef",
-  },
-  statsNumber: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  statsLabel: {
-    fontSize: FONT_SIZES.sm,
-    color: "#6b7280",
-    textAlign: "center",
-    fontWeight: FONT_WEIGHTS.medium,
-  },
-  statsNumberWhite: {
-    color: "#fff",
-  },
-  statsLabelWhite: {
-    color: "#e5e7eb",
-  },
-  section: {
-    paddingHorizontal: PADDING.section.vertical,
-    paddingVertical: PADDING.section.vertical,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  requestsContainer: {
     marginBottom: PADDING.content.vertical,
   },
-  sectionTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
-  },
-  badge: {
-    backgroundColor: "#000",
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 24,
-    alignItems: "center",
-  },
-  badgeText: {
-    fontSize: FONT_SIZES.xs,
-    color: "#fff",
-    fontWeight: FONT_WEIGHTS.bold,
-  },
-  seeAllButton: {
-    paddingHorizontal: PADDING.buttonSmall.horizontal,
-    paddingVertical: PADDING.buttonSmall.vertical,
-  },
-  seeAllText: {
-    fontSize: FONT_SIZES.sm,
-    color: "#000",
-    fontWeight: FONT_WEIGHTS.medium,
-  },
-  quickActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: GAPS.small,
-  },
-  quickActionCard: {
-    width: (width - PADDING.section.horizontal * 2 - GAPS.small) / 2,
-    backgroundColor: "#fff",
-    borderRadius: BORDER_RADIUS.medium,
-    padding: PADDING.card.horizontal,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    marginBottom: GAPS.small,
-  },
-  primaryAction: {
-    backgroundColor: "#000",
-    borderColor: "#000",
-  },
-  actionIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  actionTitle: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  actionSubtitle: {
-    fontSize: FONT_SIZES.xs,
-    color: "#666",
-    textAlign: "center",
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: PADDING.content.horizontal * 2,
-    backgroundColor: "#fff",
-    borderRadius: BORDER_RADIUS.medium,
-    marginTop: GAPS.small,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: PADDING.content.vertical,
-  },
-  emptyTitle: {
+  requestsTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
-    marginBottom: MARGIN.text.bottom,
+    marginBottom: GAPS.medium,
   },
-  emptySubtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: PADDING.content.vertical,
+  viewAllRequests: {
+    alignItems: "center",
+    paddingVertical: GAPS.medium,
   },
-  emptyActionButton: {
-    backgroundColor: "#000",
-    borderRadius: BORDER_RADIUS.medium,
-    paddingHorizontal: PADDING.button.horizontal,
-    paddingVertical: PADDING.buttonSmall.vertical,
-  },
-  emptyActionText: {
-    fontSize: FONT_SIZES.sm,
-    color: "#fff",
+  viewAllText: {
+    fontSize: FONT_SIZES.md,
+    color: "#000",
     fontWeight: FONT_WEIGHTS.medium,
   },
-  notificationItem: {
+  statsContainer: {
+    marginBottom: PADDING.content.vertical,
+  },
+  
+  // Main Stats Row - Large horizontal cards
+  mainStatsRow: {
     flexDirection: "row",
+    marginBottom: GAPS.large,
+    gap: GAPS.medium,
+  },
+  mainStatsCard: {
+    flex: 1,
+    borderRadius: BORDER_RADIUS.large,
+    padding: PADDING.card.horizontal,
+    minHeight: 120,
+    justifyContent: "space-between",
+  },
+  primaryCard: {
+    backgroundColor: "#000",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  secondaryCard: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: GAPS.medium,
+  },
+  mainStatsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#fff",
+  },
+  cardContent: {
+    alignItems: "flex-start",
+  },
+  mainStatsNumber: {
+    fontSize: FONT_SIZES.xxxl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: "#fff",
+    marginBottom: GAPS.small,
+  },
+  mainStatsLabel: {
+    fontSize: FONT_SIZES.md,
+    color: "rgba(255, 255, 255, 0.8)",
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  mainStatsLabelSecondary: {
+    fontSize: FONT_SIZES.md,
+    color: "#666",
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  mainStatsNumberSecondary: {
+    fontSize: FONT_SIZES.xxxl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: "#000",
+    marginBottom: GAPS.small,
+  },
+  
+  // Secondary Stats Row - Compact horizontal cards
+  secondaryStatsRow: {
+    flexDirection: "row",
+    gap: GAPS.small,
+  },
+  secondaryStatsCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#fff",
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
-    marginBottom: GAPS.small,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    alignItems: "center",
+    borderColor: "#e9ecef",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  notificationTypeIcon: {
-    fontSize: 24,
-    marginRight: PADDING.content.vertical,
+  streakCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#000",
+  },
+  weekCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#666",
+  },
+  achievementCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#999",
+  },
+  secondaryIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f8f9fa",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: GAPS.medium,
+  },
+  secondaryContent: {
+    flex: 1,
+  },
+  secondaryNumber: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: "#000",
+    marginBottom: 2,
+  },
+  secondaryLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: "#666",
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  activitiesSection: {
+    marginBottom: PADDING.content.vertical,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: GAPS.medium,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.semibold,
+    color: "#000",
+  },
+  seeAllButton: {
+    paddingVertical: GAPS.small,
+  },
+  seeAllText: {
+    fontSize: FONT_SIZES.md,
+    color: "#000",
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: PADDING.content.vertical * 2,
+  },
+  emptyTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#666",
+    marginTop: GAPS.medium,
+    marginBottom: GAPS.small,
+  },
+  emptySubtitle: {
+    fontSize: FONT_SIZES.md,
+    color: "#999",
+    textAlign: "center",
+    marginBottom: GAPS.large,
+  },
+  emptyActionButton: {
+    backgroundColor: "#000",
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.button.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  emptyActionText: {
+    color: "#fff",
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  notificationsSection: {
+    marginBottom: PADDING.content.vertical,
+  },
+  notificationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginBottom: GAPS.small,
+  },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: GAPS.medium,
   },
   notificationContent: {
     flex: 1,
   },
   notificationTitle: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: FONT_WEIGHTS.semibold,
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
     color: "#000",
-    marginBottom: 2,
+    marginBottom: GAPS.small,
   },
   notificationMessage: {
-    fontSize: FONT_SIZES.xs,
+    fontSize: FONT_SIZES.sm,
     color: "#666",
-    marginBottom: 4,
+    marginBottom: GAPS.small,
   },
   notificationTime: {
     fontSize: FONT_SIZES.xs,
@@ -607,7 +726,27 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#ff4444",
   },
-  bottomSpacing: {
-    height: 100,
+  quickActionsSection: {
+    marginBottom: PADDING.content.vertical,
+  },
+  quickActionsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  quickActionButton: {
+    flex: 1,
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    alignItems: "center",
+    marginHorizontal: GAPS.small,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  quickActionText: {
+    fontSize: FONT_SIZES.sm,
+    color: "#000",
+    marginTop: GAPS.small,
+    fontWeight: FONT_WEIGHTS.medium,
   },
 });

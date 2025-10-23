@@ -208,7 +208,7 @@ export default function HelpSupportScreen() {
       {/* App Version */}
       <View style={styles.versionInfo}>
         <Text style={styles.versionText}>Link Up v1.0.0</Text>
-        <Text style={styles.versionSubtext}>Last updated: January 2024</Text>
+        <Text style={styles.versionSubtext}>Last updated: January 2025</Text>
       </View>
     </ScrollView>
   );

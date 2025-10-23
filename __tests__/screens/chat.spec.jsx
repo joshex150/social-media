@@ -53,21 +53,21 @@ describe('Chat Screen', () => {
       id: '1',
       text: 'Hello everyone!',
       sender: 'Alice',
-      timestamp: '2024-01-15T09:00:00Z',
+      timestamp: '2025-01-15T09:00:00Z',
       isOwn: false
     },
     {
       id: '2',
       text: 'Hey Alice! How are you?',
       sender: 'Bob',
-      timestamp: '2024-01-15T09:01:00Z',
+      timestamp: '2025-01-15T09:01:00Z',
       isOwn: true
     },
     {
       id: '3',
       text: 'Looking forward to the activity!',
       sender: 'Charlie',
-      timestamp: '2024-01-15T09:02:00Z',
+      timestamp: '2025-01-15T09:02:00Z',
       isOwn: false
     }
   ];
@@ -226,7 +226,7 @@ describe('Chat Screen', () => {
     const { getByTestId } = render(<ChatScreen />);
     
     await waitFor(() => {
-      expect(getByTestId('message-timestamp')).toHaveTextContent('2024-01-15T09:00:00Z');
+      expect(getByTestId('message-timestamp')).toHaveTextContent('2025-01-15T09:00:00Z');
     });
   });
 
@@ -247,7 +247,7 @@ describe('Chat Screen', () => {
       id: '4',
       text: 'New message!',
       sender: 'David',
-      timestamp: '2024-01-15T09:03:00Z',
+      timestamp: '2025-01-15T09:03:00Z',
       isOwn: false
     };
 

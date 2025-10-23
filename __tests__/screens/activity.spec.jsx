@@ -80,7 +80,7 @@ describe('Activity Screen', () => {
     location: 'Central Park',
     latitude: 40.7829,
     longitude: -73.9654,
-    startTime: '2024-01-15T09:00:00Z',
+    startTime: '2025-01-15T09:00:00Z',
     maxParticipants: 8,
     participants: [
       { id: 'user1', name: 'Alice', status: 'accepted' },
@@ -93,7 +93,7 @@ describe('Activity Screen', () => {
     userId: 'user3',
     userName: 'Charlie',
     message: 'Would love to join!',
-    timestamp: '2024-01-15T08:30:00Z'
+    timestamp: '2025-01-15T08:30:00Z'
   };
 
   beforeEach(() => {
@@ -201,8 +201,8 @@ describe('Activity Screen', () => {
 
   it('displays chat messages', async () => {
     const mockMessages = [
-      { id: '1', text: 'Hello everyone!', sender: 'Alice', timestamp: '2024-01-15T09:00:00Z' },
-      { id: '2', text: 'Looking forward to this!', sender: 'Bob', timestamp: '2024-01-15T09:01:00Z' }
+      { id: '1', text: 'Hello everyone!', sender: 'Alice', timestamp: '2025-01-15T09:00:00Z' },
+      { id: '2', text: 'Looking forward to this!', sender: 'Bob', timestamp: '2025-01-15T09:01:00Z' }
     ];
 
     global.fetch.mockResolvedValueOnce({

@@ -1,149 +1,143 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, Modal, Dimensions } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import ChatBox from "@/components/ChatBox";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useApi } from "@/contexts/ApiContext";
+import type { Chat } from "@/services/api";
 
-interface Chat {
-  id: string;
-  eventId: string;
-  eventTitle: string;
-  participants: number;
-  lastMessage: string;
-  lastMessageTime: number;
-  unreadCount: number;
-}
-
-interface Message {
-  id: string;
-  userId: string;
-  userName: string;
-  text: string;
-  timestamp: number;
-}
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function ChatScreen() {
-  const [activeChats, setActiveChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [loading, setLoading] = useState(true);
+
   const safeArea = useSafeAreaStyle();
+  const { chats, loadChats, sendMessage } = useApi();
 
   useEffect(() => {
-    loadActiveChats();
-  }, []);
+    loadChats();
+    setLoading(false);
+  }, [loadChats]);
 
-  const loadActiveChats = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/events/active-chats');
-      const data = await response.json();
-      setActiveChats(data.chats || []);
-    } catch (error) {
-      console.error('Failed to load active chats:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleBackToList = () => {
+    setSelectedChat(null);
   };
 
   const handleChatSelect = (chat: Chat) => {
     setSelectedChat(chat);
   };
 
-  const handleBackToList = () => {
-    setSelectedChat(null);
-    loadActiveChats(); // Refresh to get latest messages
-  };
-
-  const handleSendMessage = async (message: any) => {
-    if (!selectedChat || !(selectedChat as any).eventId) {
-      Alert.alert('Error', 'No chat selected');
-      return;
-    }
-    try {
-      const eventId = (selectedChat as any).eventId;
-      const response = await fetch(`/api/events/${eventId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          userId: 'user_123',
-          userName: 'You',
-        }),
-      });
-
-      if (response.ok) {
-        // Message sent successfully, chat will refresh automatically
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send message');
+  const handleSendMessage = async (message: string) => {
+    if (!selectedChat) return;
+    
+    const result = await sendMessage(selectedChat.id, message);
+    if (result.success) {
+      // Message sent successfully, the chat list will be updated automatically
+      console.log('Message sent successfully');
+    } else {
+      Alert.alert('Error', result.error || 'Failed to send message');
     }
   };
 
-  if (selectedChat) {
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+
+  if (loading) {
     return (
-      <View style={[styles.container, safeArea.content]}>
-        <View style={[styles.chatHeader, safeArea.header]}>
-          <TouchableOpacity onPress={handleBackToList} style={styles.backButton}>
-            <FontAwesome name="arrow-left" size={20} color="#000" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <View style={styles.chatInfo}>
-            <Text style={styles.chatTitle}>{selectedChat.eventTitle}</Text>
-            <Text style={styles.chatSubtitle}>{selectedChat.participants} participants</Text>
-          </View>
-        </View>
-        
-        <ChatBox
-          messages={[]} // TODO: Load messages for this chat
-          onSendMessage={handleSendMessage}
-          onTyping={() => {}} // TODO: Implement typing indicator
-        />
+      <View style={[styles.container, styles.centerContent, safeArea.content]}>
+        <FontAwesome name="spinner" size={32} color="#000" />
+        <Text style={styles.loadingText}>Loading chats...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={[styles.container, safeArea.content]}>
-      <View style={[styles.header, safeArea.header]}>
-        <Text style={styles.title}>Active Chats</Text>
-        <Text style={styles.subtitle}>Join conversations from your activities</Text>
-      </View>
-
-      {activeChats.length > 0 ? (
-        activeChats.map((chat) => (
-          <TouchableOpacity
-            key={chat.id}
-            style={styles.chatItem}
-            onPress={() => handleChatSelect(chat)}
-          >
-            <View style={styles.chatContent}>
-              <Text style={styles.chatEventTitle}>{chat.eventTitle}</Text>
-              <Text style={styles.chatLastMessage}>{chat.lastMessage}</Text>
-              <Text style={styles.chatTime}>{chat.lastMessageTime}</Text>
-            </View>
-            <View style={styles.chatMeta}>
-              <View style={styles.participantCount}>
-                <Text style={styles.participantCountText}>{chat.participants}</Text>
-              </View>
-              {chat.unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadText}>{chat.unreadCount}</Text>
-                </View>
-              )}
-            </View>
+    <>
+      <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+        {/* Header */}
+        <View style={[styles.header, safeArea.header]}>
+          <Text style={styles.title}>Messages</Text>
+          <TouchableOpacity style={styles.searchButton}>
+            <FontAwesome name="search" size={20} color="#000" />
           </TouchableOpacity>
-        ))
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No active chats</Text>
-          <Text style={styles.emptySubtitle}>
-            Join an activity to start chatting with other participants
-          </Text>
         </View>
-      )}
-    </ScrollView>
+
+        {/* Chats List */}
+        {chats?.length > 0 ? (
+          chats.map((chat) => (
+            <TouchableOpacity
+              key={chat.id}
+              style={styles.chatItem}
+              onPress={() => handleChatSelect(chat)}
+            >
+              <View style={styles.chatAvatar}>
+                <FontAwesome name="users" size={20} color="#000" />
+              </View>
+              <View style={styles.chatContent}>
+                <Text style={styles.chatEventTitle}>{chat.activityTitle}</Text>
+                <Text style={styles.chatLastMessage}>{chat.lastMessage.text}</Text>
+                <Text style={styles.chatTime}>{formatTime(chat.lastMessage.timestamp)}</Text>
+              </View>
+              <View style={styles.chatMeta}>
+                <Text style={styles.participantCount}>{chat.participants}</Text>
+                {chat.unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadText}>{chat.unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <FontAwesome name="comment-o" size={48} color="#ccc" />
+            <Text style={styles.emptyTitle}>No active chats</Text>
+            <Text style={styles.emptySubtitle}>
+              Join an activity to start chatting with other participants
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Chat Modal */}
+      <Modal
+        visible={!!selectedChat}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleBackToList}
+      >
+        <View style={[styles.modalContainer, safeArea.content]}>
+          <View style={[styles.chatHeader, safeArea.header]}>
+            <TouchableOpacity onPress={handleBackToList} style={styles.backButton}>
+              <FontAwesome name="arrow-left" size={20} color="#000" />
+            </TouchableOpacity>
+            <View style={styles.chatInfo}>
+              <Text style={styles.chatTitle}>{selectedChat?.activityTitle}</Text>
+              <Text style={styles.chatSubtitle}>{selectedChat?.participants} participants</Text>
+            </View>
+          </View>
+          
+          <View style={styles.chatContainer}>
+            <ChatBox
+              messages={selectedChat?.messages || []}
+              onSendMessage={handleSendMessage}
+              onTyping={() => {}}
+            />
+          </View>
+        </View>
+      </Modal>
+    </>
   );
+
 }
 
 const styles = StyleSheet.create({
@@ -151,26 +145,97 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  contentContainer: {
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+  },
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.md,
+    color: "#666",
+    marginTop: GAPS.medium,
+  },
   header: {
-    paddingHorizontal: PADDING.header.horizontal,
-    paddingVertical: PADDING.header.vertical,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: PADDING.content.vertical,
   },
   title: {
-    fontSize: FONT_SIZES.xxxl,
+    fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
+    color: "#000",
+  },
+  searchButton: {
+    padding: GAPS.small,
+  },
+  chatItem: {
+    flexDirection: "row",
+    // paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  chatAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#f8f9fa",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: GAPS.medium,
+  },
+  chatContent: {
+    flex: 1,
+  },
+  chatEventTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
     marginBottom: MARGIN.text.bottom,
   },
-  subtitle: {
-    fontSize: FONT_SIZES.md,
+  chatLastMessage: {
+    fontSize: FONT_SIZES.sm,
     color: "#666",
+    marginBottom: MARGIN.text.bottom,
+  },
+  chatTime: {
+    fontSize: FONT_SIZES.xs,
+    color: "#999",
+  },
+  chatMeta: {
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    right: 0,
+    top: 14,
+    width:20
+  },
+  participantCount: {
+    fontSize: FONT_SIZES.xs,
+    color: "#999",
+    marginBottom: GAPS.small,
+  },
+  unreadBadge: {
+    backgroundColor: "#ff4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unreadText: {
+    color: "#fff",
+    fontSize: FONT_SIZES.xs,
+    fontWeight: FONT_WEIGHTS.bold,
   },
   chatHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: PADDING.header.horizontal,
+    paddingHorizontal: PADDING.content.horizontal,
     paddingVertical: PADDING.header.vertical,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
@@ -195,80 +260,33 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
+    marginBottom: GAPS.small,
   },
   chatSubtitle: {
     fontSize: FONT_SIZES.sm,
     color: "#666",
   },
-  chatItem: {
-    flexDirection: "row",
-    paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatEventTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
-    marginBottom: MARGIN.text.bottom,
-  },
-  chatLastMessage: {
-    fontSize: FONT_SIZES.sm,
-    color: "#666",
-    marginBottom: MARGIN.text.bottom,
-  },
-  chatTime: {
-    fontSize: FONT_SIZES.xs,
-    color: "#999",
-  },
-  chatMeta: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-  },
-  participantCount: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: BORDER_RADIUS.large,
-    paddingHorizontal: GAPS.small,
-    paddingVertical: MARGIN.text.bottom,
-    marginBottom: MARGIN.text.bottom,
-  },
-  participantCountText: {
-    fontSize: FONT_SIZES.xs,
-    color: "#666",
-    fontWeight: FONT_WEIGHTS.medium,
-  },
-  unreadBadge: {
-    backgroundColor: "#000",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  unreadText: {
-    fontSize: FONT_SIZES.xs,
-    color: "#fff",
-    fontWeight: FONT_WEIGHTS.semibold,
-  },
   emptyState: {
     alignItems: "center",
-    paddingVertical: PADDING.content.horizontal * 3,
-    paddingHorizontal: PADDING.content.horizontal * 2,
+    paddingVertical: PADDING.content.vertical * 2,
   },
   emptyTitle: {
     fontSize: FONT_SIZES.lg,
-    fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#666",
+    marginTop: GAPS.medium,
     marginBottom: GAPS.small,
   },
   emptySubtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: "#666",
+    fontSize: FONT_SIZES.md,
+    color: "#999",
     textAlign: "center",
-    lineHeight: 20,
+  },
+  chatContainer: {
+    flex: 1,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
 });

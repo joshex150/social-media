@@ -14,134 +14,129 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView from '@/components/MapView';
 import ChatBox from '@/components/ChatBox';
 import FeedbackModal from '@/components/FeedbackModal';
-
-interface Activity {
-  id: string;
-  title: string;
-  category: string;
-  description: string;
-  location: string;
-  startTime: number;
-  maxParticipants: number;
-  distance: string;
-  latitude: number;
-  longitude: number;
-}
-
-interface Participant {
-  id: string;
-  name: string;
-  status: string;
-  latitude?: number;
-  longitude?: number;
-}
+import { useApi } from '@/contexts/ApiContext';
+import type { Activity, Chat } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
 export default function ActivityDetailsScreen() {
   const [activity, setActivity] = useState<Activity | null>(null);
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [chat, setChat] = useState<Chat | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [showFeedback, setShowFeedback] = useState(false);
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { activities, chats, loadActivities, loadChats } = useApi();
 
-  useEffect(() => {
-    loadActivityDetails();
-  }, [id]);
-
-  const loadActivityDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/events/${id}`);
-      const data = await response.json();
-      setActivity(data.activity);
-      setParticipants(data.participants || []);
-    } catch (error) {
-      console.error('Failed to load activity details:', error);
-      Alert.alert('Error', 'Failed to load activity details');
-    } finally {
-      setLoading(false);
+  // Load activity and chat data
+  const loadActivityData = async () => {
+    if (!id) return;
+    
+    await Promise.all([loadActivities(), loadChats()]);
+    
+    const activityData = activities.find(a => a._id === id);
+    if (activityData) {
+      setActivity(activityData);
+      
+      // Find associated chat
+      const chatData = chats.find(c => c.activityId === activityData._id);
+      if (chatData) {
+        setChat(chatData);
+      }
     }
+    setLoading(false);
   };
 
-  const handleJoin = async () => {
-    try {
-      const response = await fetch(`/api/events/${id}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'request',
-          userId: 'user_123',
-          userName: 'You',
-          message: 'I\'d like to join this activity!',
-        }),
-      });
+  useEffect(() => {
+    loadActivityData();
+  }, [id]);
 
-      if (response.ok) {
-        Alert.alert('Success', 'Join request sent!');
-        loadActivityDetails(); // Refresh data
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send join request');
-    }
+  const handleJoinActivity = () => {
+    Alert.alert(
+      'Join Activity',
+      'Request to join this activity?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Join', 
+          onPress: () => {
+            Alert.alert('Success', 'Join request sent!');
+          }
+        }
+      ]
+    );
   };
 
   const handleSendMessage = async (message: string) => {
-    try {
-      const response = await fetch(`/api/events/${id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          userId: 'user_123',
-          userName: 'You',
-        }),
-      });
+    if (!chat) return;
+    
+    // Simulate sending message
+    const newMessage = {
+      id: Date.now().toString(),
+      chatId: chat.id,
+      senderId: 'current',
+      senderName: 'You',
+      text: message,
+      timestamp: new Date().toISOString(),
+      type: 'text' as const
+    };
 
-      if (response.ok) {
-        // Message sent successfully
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send message');
-    }
+    // Update chat with new message
+    setChat(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        lastMessage: {
+          text: message,
+          sender: 'You',
+          timestamp: new Date().toISOString()
+        },
+        messages: [...prev.messages, newMessage]
+      };
+    });
   };
 
-  const handleFeedback = async (feedback) => {
-    try {
-      const response = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId: id,
-          type: 'activity',
-          ...feedback,
-        }),
-      });
+  const handleFeedback = async (feedback: any) => {
+    Alert.alert('Thank you!', 'Your feedback has been recorded.');
+    setShowFeedback(false);
+  };
 
-      if (response.ok) {
-        setShowFeedback(false);
-        Alert.alert('Success', 'Feedback submitted!');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to submit feedback');
-    }
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered, safeArea.content]}>
-        <Text style={styles.loadingText}>Loading activity details...</Text>
+      <View style={[styles.container, styles.centerContent, safeArea.content]}>
+        <FontAwesome name="spinner" size={32} color="#000" />
+        <Text style={styles.loadingText}>Loading activity...</Text>
       </View>
     );
   }
 
   if (!activity) {
     return (
-      <View style={[styles.container, styles.centered, safeArea.content]}>
-        <Text style={styles.errorText}>Activity not found</Text>
+      <View style={[styles.container, styles.centerContent, safeArea.content]}>
+        <FontAwesome name="exclamation-triangle" size={48} color="#ccc" />
+        <Text style={styles.errorTitle}>Activity not found</Text>
+        <Text style={styles.errorSubtitle}>This activity may have been removed or doesn't exist.</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
@@ -149,24 +144,12 @@ export default function ActivityDetailsScreen() {
     );
   }
 
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   return (
     <View style={[styles.container, safeArea.content]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <FontAwesome name="arrow-left" size={20} color="#000" />
-          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{activity.title}</Text>
         <TouchableOpacity onPress={() => setShowFeedback(true)} style={styles.feedbackButton}>
@@ -180,6 +163,7 @@ export default function ActivityDetailsScreen() {
           style={[styles.tab, activeTab === 'details' && styles.activeTab]}
           onPress={() => setActiveTab('details')}
         >
+          <FontAwesome name="info-circle" size={16} color={activeTab === 'details' ? "#000" : "#666"} />
           <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
             Details
           </Text>
@@ -188,6 +172,7 @@ export default function ActivityDetailsScreen() {
           style={[styles.tab, activeTab === 'map' && styles.activeTab]}
           onPress={() => setActiveTab('map')}
         >
+          <FontAwesome name="map-marker" size={16} color={activeTab === 'map' ? "#000" : "#666"} />
           <Text style={[styles.tabText, activeTab === 'map' && styles.activeTabText]}>
             Map
           </Text>
@@ -196,90 +181,126 @@ export default function ActivityDetailsScreen() {
           style={[styles.tab, activeTab === 'chat' && styles.activeTab]}
           onPress={() => setActiveTab('chat')}
         >
+          <FontAwesome name="comment" size={16} color={activeTab === 'chat' ? "#000" : "#666"} />
           <Text style={[styles.tabText, activeTab === 'chat' && styles.activeTabText]}>
             Chat
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
+      {/* Tab Content */}
       {activeTab === 'details' && (
-        <ScrollView style={styles.content}>
-          <View style={styles.detailsCard}>
-            <Text style={styles.category}>{activity.category}</Text>
-            <Text style={styles.description}>{activity.description}</Text>
-            
+        <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentContainer}>
+          {/* Activity Image */}
+          {activity.imageUrl && (
+            <View style={styles.imageContainer}>
+              <Text style={styles.imagePlaceholder}>📸 Activity Image</Text>
+            </View>
+          )}
+
+          {/* Basic Info */}
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Activity Information</Text>
             <View style={styles.infoRow}>
+              <FontAwesome name="calendar" size={16} color="#666" />
+              <Text style={styles.infoLabel}>Date:</Text>
+              <Text style={styles.infoValue}>{formatDate(activity.date)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <FontAwesome name="clock-o" size={16} color="#666" />
+              <Text style={styles.infoLabel}>Time:</Text>
+              <Text style={styles.infoValue}>{formatTime(activity.date)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <FontAwesome name="map-marker" size={16} color="#666" />
               <Text style={styles.infoLabel}>Location:</Text>
-              <Text style={styles.infoValue}>{activity.location}</Text>
+              <Text style={styles.infoValue}>{activity.location.name}</Text>
             </View>
-            
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>When:</Text>
-              <Text style={styles.infoValue}>{formatTime(activity.startTime)}</Text>
-            </View>
-            
-            <View style={styles.infoRow}>
+              <FontAwesome name="users" size={16} color="#666" />
               <Text style={styles.infoLabel}>Participants:</Text>
               <Text style={styles.infoValue}>
-                {participants.length} / {activity.maxParticipants}
+                {activity.participants.length}/{activity.maxParticipants}
               </Text>
             </View>
-            
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Distance:</Text>
-              <Text style={styles.infoValue}>{activity.distance}km away</Text>
+              <FontAwesome name="tag" size={16} color="#666" />
+              <Text style={styles.infoLabel}>Category:</Text>
+              <Text style={styles.infoValue}>{activity.category}</Text>
             </View>
           </View>
 
+          {/* Description */}
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Description</Text>
+            <Text style={styles.description}>{activity.description}</Text>
+          </View>
+
+          {/* Tags */}
+          {activity.tags && activity.tags.length > 0 && (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>Tags</Text>
+              <View style={styles.tagsContainer}>
+                {activity.tags.map((tag, index) => (
+                  <View key={index} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Participants */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Participants</Text>
-            {participants.map((participant) => (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Participants ({activity.participants.length})</Text>
+            {activity.participants.map((participant) => (
               <View key={participant.id} style={styles.participantItem}>
                 <View style={styles.participantAvatar}>
-                  <Text style={styles.participantInitial}>
-                    {participant.name.charAt(0).toUpperCase()}
-                  </Text>
+                  <FontAwesome name="user" size={16} color="#000" />
                 </View>
-                <View style={styles.participantInfo}>
-                  <Text style={styles.participantName}>{participant.name}</Text>
-                  <Text style={styles.participantStatus}>{participant.status}</Text>
-                </View>
+                <Text style={styles.participantName}>{participant.name}</Text>
               </View>
             ))}
           </View>
 
           {/* Join Button */}
-          <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-            <Text style={styles.joinButtonText}>Request to Join</Text>
+          <TouchableOpacity style={styles.joinButton} onPress={handleJoinActivity}>
+            <FontAwesome name="plus" size={20} color="#fff" />
+            <Text style={styles.joinButtonText}>Join Activity</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
 
       {activeTab === 'map' && (
-        <View style={styles.mapContainer}>
+        <View style={styles.tabContent}>
           <MapView
-            event={activity}
-            participants={participants}
+            event={{
+              location: activity.location.name,
+              latitude: activity.location.latitude,
+              longitude: activity.location.longitude
+            }}
+            participants={activity.participants}
           />
         </View>
       )}
 
-      {activeTab === 'chat' && (
-        <ChatBox
-          eventId={id}
-          onSendMessage={handleSendMessage}
-        />
+      {activeTab === 'chat' && chat && (
+        <View style={styles.tabContent}>
+          <ChatBox
+            messages={chat.messages}
+            onSendMessage={handleSendMessage}
+            onTyping={() => {}}
+          />
+        </View>
       )}
 
       {/* Feedback Modal */}
-      {showFeedback && (
-        <FeedbackModal
-          onClose={() => setShowFeedback(false)}
-          onSubmit={handleFeedback}
-        />
-      )}
+      <FeedbackModal
+        visible={showFeedback}
+        event={activity}
+        onClose={() => setShowFeedback(false)}
+        onSubmit={handleFeedback}
+      />
     </View>
   );
 }
@@ -289,23 +310,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  centered: {
+  centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     fontSize: 16,
     color: '#666',
+    marginTop: 16,
   },
-  errorText: {
-    fontSize: 18,
-    color: '#000',
-    marginBottom: 16,
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -327,7 +356,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
     flex: 1,
-    textAlign: 'center',
     marginHorizontal: 16,
   },
   feedbackButton: {
@@ -345,110 +373,124 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   activeTab: {
     borderBottomWidth: 2,
     borderBottomColor: '#000',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    marginLeft: 8,
     fontWeight: '500',
   },
   activeTabText: {
     color: '#000',
   },
-  content: {
+  tabContent: {
     flex: 1,
   },
-  detailsCard: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+  tabContentContainer: {
     padding: 16,
-    margin: 16,
   },
-  category: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 16,
-    color: '#000',
-    lineHeight: 24,
+  imageContainer: {
+    height: 200,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
+  },
+  imagePlaceholder: {
+    fontSize: 16,
+    color: '#999',
+  },
+  infoCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 12,
   },
   infoRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
   },
   infoLabel: {
     fontSize: 14,
     color: '#666',
-    width: 100,
+    marginLeft: 8,
+    marginRight: 8,
+    minWidth: 80,
   },
   infoValue: {
     fontSize: 14,
     color: '#000',
     flex: 1,
   },
-  section: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  description: {
+    fontSize: 14,
     color: '#000',
-    marginBottom: 12,
+    lineHeight: 20,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  tag: {
+    backgroundColor: '#e9ecef',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  tagText: {
+    fontSize: 12,
+    color: '#000',
   },
   participantItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 8,
   },
   participantAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#000',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e9ecef',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  participantInitial: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  participantInfo: {
-    flex: 1,
-  },
   participantName: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
-  },
-  participantStatus: {
     fontSize: 14,
-    color: '#666',
+    color: '#000',
   },
   joinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#000',
     borderRadius: 8,
     paddingVertical: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    alignItems: 'center',
+    marginTop: 16,
   },
   joinButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
-  },
-  mapContainer: {
-    flex: 1,
+    marginLeft: 8,
   },
 });

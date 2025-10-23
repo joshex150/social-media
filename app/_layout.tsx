@@ -12,6 +12,8 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/components/useColorScheme";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ApiProvider, useApi } from "@/contexts/ApiContext";
+import { View, Text, StyleSheet } from "react-native";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -55,21 +57,82 @@ function RootLayoutNav() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              gestureEnabled: true,
-              animation: "slide_from_right",
-              gestureDirection: "horizontal",
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-          </Stack>
-        </GestureHandlerRootView>
-      </ThemeProvider>
+      <ApiProvider>
+        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <AppNavigator />
+          </GestureHandlerRootView>
+        </ThemeProvider>
+      </ApiProvider>
     </SafeAreaProvider>
   );
 }
+
+function AppNavigator() {
+  const { isAuthenticated, isGuest, isLoading } = useApi();
+  const hasAccess = isAuthenticated || isGuest;
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <FontAwesome name="users" size={48} color="#000" />
+        <Text style={styles.loadingText}>Link Up</Text>
+        <Text style={styles.loadingSubtext}>Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        gestureEnabled: true,
+        animation: "slide_from_right",
+        gestureDirection: "horizontal",
+      }}
+    >
+      <Stack.Screen 
+        name="login" 
+        options={{ 
+          headerShown: false,
+          ...(hasAccess && { href: null }) // Hide login when authenticated or guest
+        }} 
+      />
+      <Stack.Screen 
+        name="onboarding" 
+        options={{ 
+          headerShown: false,
+          ...(hasAccess && { href: null }) // Hide onboarding when authenticated or guest
+        }} 
+      />
+      <Stack.Screen 
+        name="(tabs)" 
+        options={{ 
+          headerShown: false,
+          ...(!hasAccess && { href: null }) // Hide tabs when not authenticated and not guest
+        }} 
+      />
+      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+    </Stack>
+  );
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000',
+    marginTop: 16,
+  },
+  loadingSubtext: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 8,
+  },
+});

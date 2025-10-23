@@ -2,7 +2,14 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
-export default function SubscriptionTier({ tier, isActive, onUpgrade, limits }) {
+const shouldShowUpgradeButton = (tier, currentUserSubscription) => {
+  const tierOrder = ['free', 'silver', 'gold', 'platinum'];
+  const currentIndex = tierOrder.indexOf(currentUserSubscription);
+  const tierIndex = tierOrder.indexOf(tier);
+  return tierIndex > currentIndex;
+};
+
+export default function SubscriptionTier({ tier, isActive, onUpgrade, limits, currentUserSubscription }) {
   const { name, price, maxActivities, maxRadius, features } = limits;
 
   return (
@@ -34,7 +41,7 @@ export default function SubscriptionTier({ tier, isActive, onUpgrade, limits }) 
         </View>
       )}
 
-      {!isActive && (
+      {!isActive && shouldShowUpgradeButton(tier, currentUserSubscription) && (
         <TouchableOpacity
           style={styles.upgradeButton}
           onPress={() => onUpgrade(tier)}

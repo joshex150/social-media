@@ -1,109 +1,227 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, FlatList, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, RefreshControl } from "react-native";
+import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useRouter } from "expo-router";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ActivityCard from "@/components/ActivityCard";
 import VibeCheck from "@/components/VibeCheck";
-import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useApi } from "@/contexts/ApiContext";
+import type { Activity } from "@/services/api";
 
-export default function Dashboard() {
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [radius, setRadius] = useState(10);
+const RADIUS_OPTIONS = [5, 10, 20];
+const CATEGORIES = [
+  { id: 'all', name: 'All', icon: 'th' },
+  { id: 'social', name: 'Social', icon: 'users' },
+  { id: 'fitness', name: 'Fitness', icon: 'heart' },
+  { id: 'learning', name: 'Learning', icon: 'book' },
+  { id: 'food', name: 'Food', icon: 'cutlery' },
+  { id: 'travel', name: 'Travel', icon: 'plane' },
+  { id: 'music', name: 'Music', icon: 'music' },
+  { id: 'sports', name: 'Sports', icon: 'futbol-o' },
+  { id: 'tech', name: 'Tech', icon: 'laptop' }
+];
+
+export default function ExploreScreen() {
+  const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
+  const [selectedRadius, setSelectedRadius] = useState(10);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [refreshing, setRefreshing] = useState(false);
+  const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { activities, loadActivities, refreshData } = useApi();
+
+  // Load activities from API
+  const loadActivitiesData = async () => {
+    await loadActivities();
+    filterActivities(activities, selectedRadius, selectedCategory);
+  };
+
+  const filterActivities = (activitiesList: Activity[], radius: number, category: string) => {
+    let filtered = activitiesList.filter(activity => activity.radius <= radius);
+    
+    if (category !== 'all') {
+      filtered = filtered.filter(activity => activity.category === category);
+    }
+    
+    setFilteredActivities(filtered);
+  };
 
   useEffect(() => {
-    loadActivities();
-  }, [radius]);
+    loadActivitiesData();
+  }, []);
 
-  const loadActivities = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/events?radius=${radius}&lat=40.7128&lng=-74.006`);
-      const data = await response.json();
-      setActivities(data.activities || []);
-    } catch (error) {
-      console.error('Failed to load activities:', error);
-      Alert.alert('Error', 'Failed to load activities');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    filterActivities(activities, selectedRadius, selectedCategory);
+  }, [activities, selectedRadius, selectedCategory]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshData();
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const handleJoin = async (activityId: string) => {
-    try {
-      const response = await fetch(`/api/events/${activityId}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'request',
-          userId: 'user_123',
-          userName: 'John Doe',
-          message: 'Would love to join!',
-        }),
-      });
-      
-      if (response.ok) {
-        Alert.alert('Success', 'Join request sent!');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send join request');
-    }
+  const handleRadiusChange = (radius: number) => {
+    setSelectedRadius(radius);
+    filterActivities(activities, radius, selectedCategory);
   };
 
-  const handleView = (activityId: string) => {
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    filterActivities(activities, selectedRadius, category);
+  };
+
+  const handleJoinActivity = (activityId: string) => {
+    Alert.alert(
+      'Join Activity',
+      'Request to join this activity?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Join', 
+          onPress: () => {
+            Alert.alert('Success', 'Join request sent!');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleViewActivity = (activityId: string) => {
     router.push(`/activity/${activityId}`);
   };
 
   const handleVibeFeedback = async (vibe: string) => {
-    console.log('Vibe feedback:', vibe);
+    setVibeFeedback(vibe);
+    Alert.alert('Thank you!', 'Your feedback has been recorded.');
   };
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyTitle}>No activities nearby</Text>
-      <Text style={styles.emptySubtitle}>Create your first activity</Text>
-    </View>
-  );
-
   return (
-    <View style={[styles.container, safeArea.content]}>
-      <View style={[styles.header]}>
-        <Text style={styles.title}>Discover Activities</Text>
-        <View style={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Filter by radius</Text>
-          <View style={styles.radiusButtons}>
-            {[5, 10, 20].map((r) => (
-              <TouchableOpacity
-                key={r}
-                style={[styles.radiusButton, radius === r && styles.radiusButtonActive]}
-                onPress={() => setRadius(r)}
-              >
-                <Text style={[styles.radiusButtonText, radius === r && styles.radiusButtonTextActive]}>
-                  {r}km
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+    <ScrollView 
+      style={[styles.container]} 
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      {/* Header */}
+      <View style={[styles.header, safeArea.header]}>
+        <Text style={styles.title}>Explore Activities</Text>
+        <TouchableOpacity style={styles.filterButton}>
+          <FontAwesome name="filter" size={20} color="#000" />
+        </TouchableOpacity>
       </View>
 
+      {/* Vibe Check */}
       <VibeCheck onFeedback={handleVibeFeedback} />
 
-      <FlatList
-        data={activities}
-        keyExtractor={(item) => (item as { id: string }).id}
-        renderItem={({ item }) => (
-          <ActivityCard
-            activity={item}
-            onJoin={handleJoin}
-            onView={handleView}
-          />
-        )}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
-      />
-    </View>
+      {/* Radius Filter */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Search Radius</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.radiusFilter}>
+          {RADIUS_OPTIONS.map((radius) => (
+            <TouchableOpacity
+              key={radius}
+              style={[
+                styles.radiusButton,
+                selectedRadius === radius && styles.radiusButtonActive
+              ]}
+              onPress={() => handleRadiusChange(radius)}
+            >
+              <Text style={[
+                styles.radiusText,
+                selectedRadius === radius && styles.radiusTextActive
+              ]}>
+                {radius}km
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Category Filter */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Categories</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFilter}>
+          {CATEGORIES.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryButton,
+                selectedCategory === category.id && styles.categoryButtonActive
+              ]}
+              onPress={() => handleCategoryChange(category.id)}
+            >
+              <FontAwesome 
+                name={category.icon as any} 
+                size={16} 
+                color={selectedCategory === category.id ? "#fff" : "#666"} 
+              />
+              <Text style={[
+                styles.categoryText,
+                selectedCategory === category.id && styles.categoryTextActive
+              ]}>
+                {category.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Results Count */}
+      <View style={styles.resultsHeader}>
+        <Text style={styles.resultsCount}>
+          {filteredActivities.length} activities found
+        </Text>
+        <TouchableOpacity style={styles.sortButton}>
+          <FontAwesome name="sort" size={16} color="#666" />
+          <Text style={styles.sortText}>Sort</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Activities List */}
+        {filteredActivities.length > 0 ? (
+          filteredActivities.map((activity) => (
+            <ActivityCard
+              key={activity._id}
+              activity={activity}
+              onJoin={() => handleJoinActivity(activity._id)}
+              onView={() => handleViewActivity(activity._id)}
+            />
+          ))
+      ) : (
+        <View style={styles.emptyState}>
+          <FontAwesome name="search" size={48} color="#ccc" />
+          <Text style={styles.emptyTitle}>No activities found</Text>
+          <Text style={styles.emptySubtitle}>
+            Try adjusting your radius or category filters
+          </Text>
+          <TouchableOpacity 
+            style={styles.emptyActionButton}
+            onPress={() => {
+              setSelectedRadius(20);
+              setSelectedCategory('all');
+              filterActivities(activities, 20, 'all');
+            }}
+          >
+            <Text style={styles.emptyActionText}>Reset Filters</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Create Activity CTA */}
+      <View style={styles.createCta}>
+        <Text style={styles.createCtaTitle}>Don't see what you're looking for?</Text>
+        <Text style={styles.createCtaSubtitle}>Create your own activity and invite others to join!</Text>
+        <TouchableOpacity 
+          style={styles.createButton}
+          onPress={() => router.push('/create-activity')}
+        >
+          <FontAwesome name="plus" size={20} color="#fff" />
+          <Text style={styles.createButtonText}>Create Activity</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -112,67 +230,157 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  contentContainer: {
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+  },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: PADDING.content.vertical,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
-    marginBottom: 12,
   },
-  filterContainer: {
-    marginBottom: 8,
+  filterButton: {
+    padding: GAPS.small,
   },
-  filterLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
+  filterSection: {
+    marginBottom: PADDING.content.vertical,
   },
-  radiusButtons: {
-    flexDirection: "row",
-    gap: 8,
+  filterTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#000",
+    marginBottom: GAPS.medium,
+  },
+  radiusFilter: {
+    marginBottom: GAPS.small,
   },
   radiusButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: "#f5f5f5",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.buttonSmall.vertical,
+    marginRight: GAPS.small,
   },
   radiusButtonActive: {
     backgroundColor: "#000",
-    borderColor: "#000",
   },
-  radiusButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
+  radiusText: {
+    fontSize: FONT_SIZES.sm,
     color: "#666",
+    fontWeight: FONT_WEIGHTS.medium,
   },
-  radiusButtonTextActive: {
+  radiusTextActive: {
     color: "#fff",
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  categoryFilter: {
+    marginBottom: GAPS.small,
   },
-  emptyContainer: {
+  categoryButton: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 32,
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.buttonSmall.vertical,
+    marginRight: GAPS.small,
+  },
+  categoryButtonActive: {
+    backgroundColor: "#000",
+  },
+  categoryText: {
+    fontSize: FONT_SIZES.sm,
+    color: "#666",
+    fontWeight: FONT_WEIGHTS.medium,
+    marginLeft: GAPS.small,
+  },
+  categoryTextActive: {
+    color: "#fff",
+  },
+  resultsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: GAPS.medium,
+  },
+  resultsCount: {
+    fontSize: FONT_SIZES.md,
+    color: "#666",
+  },
+  sortButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: GAPS.small,
+  },
+  sortText: {
+    fontSize: FONT_SIZES.sm,
+    color: "#666",
+    marginLeft: GAPS.small,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: PADDING.content.vertical * 2,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 8,
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: "#666",
+    marginTop: GAPS.medium,
+    marginBottom: GAPS.small,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.md,
+    color: "#999",
+    textAlign: "center",
+    marginBottom: GAPS.large,
+  },
+  emptyActionButton: {
+    backgroundColor: "#000",
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.button.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  emptyActionText: {
+    color: "#fff",
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  createCta: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.large,
+    padding: PADDING.card.horizontal,
+    alignItems: "center",
+    marginTop: PADDING.content.vertical,
+  },
+  createCtaTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.semibold,
+    color: "#000",
+    marginBottom: GAPS.small,
+  },
+  createCtaSubtitle: {
+    fontSize: FONT_SIZES.md,
     color: "#666",
+    textAlign: "center",
+    marginBottom: GAPS.large,
+  },
+  createButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#000",
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.button.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  createButtonText: {
+    color: "#fff",
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    marginLeft: GAPS.small,
   },
 });

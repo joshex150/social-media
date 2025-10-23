@@ -20,7 +20,7 @@ export default function AboutScreen() {
   const appInfo = {
     name: "Link Up",
     version: "1.0.0",
-    build: "2024.01.15",
+    build: "2025.01.15",
     description: "Connect with people around you through shared activities and experiences.",
     features: [
       "Create and join local activities",
@@ -207,7 +207,7 @@ export default function AboutScreen() {
       {/* Copyright */}
       <View style={styles.copyright}>
         <Text style={styles.copyrightText}>
-          © 2024 Link Up Inc. All rights reserved.
+          © 2025 Link Up Inc. All rights reserved.
         </Text>
         <Text style={styles.copyrightSubtext}>
           Made with ❤️ for connecting people

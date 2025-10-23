@@ -52,7 +52,7 @@ describe('Dashboard Screen', () => {
       distance: 2.5,
       participants: 3,
       maxParticipants: 8,
-      startTime: '2024-01-15T09:00:00Z'
+      startTime: '2025-01-15T09:00:00Z'
     },
     {
       id: '2',
@@ -61,7 +61,7 @@ describe('Dashboard Screen', () => {
       distance: 1.2,
       participants: 1,
       maxParticipants: 4,
-      startTime: '2024-01-15T18:00:00Z'
+      startTime: '2025-01-15T18:00:00Z'
     }
   ];
 

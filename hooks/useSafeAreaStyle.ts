@@ -9,60 +9,68 @@ import { PADDING } from '@/constants/spacing';
 export function useSafeAreaStyle() {
   const insets = useSafeAreaInsets();
 
+  // Use stable defaults to prevent flicker
+  const stableInsets = {
+    top: insets.top || 44, // Default to 44 if not calculated yet
+    bottom: insets.bottom || 0,
+    left: insets.left || 0,
+    right: insets.right || 0,
+  };
+
   return {
     // Safe area styles for different use cases
     container: {
-      paddingTop: insets.top,
-      paddingBottom: insets.bottom,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingTop: stableInsets.top,
+      paddingBottom: stableInsets.bottom,
+      paddingLeft: stableInsets.left,
+      paddingRight: stableInsets.right,
     },
     
     // Header styles that avoid Dynamic Island
     header: {
-      paddingTop: Math.max(insets.top, 44), // Ensure minimum 44pt header height
+      paddingTop: Math.max(stableInsets.top, 44), // Ensure minimum 44pt header height
       paddingBottom: PADDING.header.vertical,
-      paddingLeft: 8,
-      paddingRight: 8,
+      // paddingLeft: 8,
+      // paddingRight: 8,
     },
     
     // Content styles that respect safe areas
     content: {
       paddingTop: PADDING.content.vertical,
-      paddingBottom: Math.max(insets.bottom, PADDING.content.vertical),
+      paddingBottom: Math.max(stableInsets.bottom, PADDING.content.vertical),
       paddingLeft: 8,
       paddingRight: 8,
     },
     
     // Tab bar styles
     tabBar: {
-      paddingBottom: insets.bottom,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingBottom: stableInsets.bottom,
+      paddingLeft: stableInsets.left,
+      paddingRight: stableInsets.right,
     },
     
     // Full screen content that goes edge-to-edge
     fullScreen: {
-      paddingTop: insets.top,
-      paddingBottom: insets.bottom,
+      paddingTop: stableInsets.top,
+      paddingBottom: stableInsets.bottom,
     },
     
     // Modal content styles
     modal: {
-      paddingTop: Math.max(insets.top, 20),
-      paddingBottom: insets.bottom,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingTop: Math.max(stableInsets.top, 20),
+      paddingBottom: stableInsets.bottom,
+      paddingLeft: stableInsets.left,
+      paddingRight: stableInsets.right,
     },
     
     // Raw insets for custom usage
-    insets,
+    insets: stableInsets,
     
     // Helper to check if device has Dynamic Island
-    hasDynamicIsland: insets.top > 44,
+    hasDynamicIsland: stableInsets.top > 44,
     
     // Helper to check if device has home indicator
-    hasHomeIndicator: insets.bottom > 0,
+    hasHomeIndicator: stableInsets.bottom > 0,
   };
 }
 

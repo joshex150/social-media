@@ -6,13 +6,21 @@ import SubscriptionTier from "@/components/SubscriptionTier";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useApi } from "@/contexts/ApiContext";
+import type { SubscriptionTier as SubscriptionTierType } from "@/services/api";
 
 export default function SubscriptionSettingsScreen() {
-  const [tiers, setTiers] = useState<any>({});
+  const [tiers, setTiers] = useState<Record<string, SubscriptionTierType>>({});
   const [currentTier, setCurrentTier] = useState('free');
-  const [usage, setUsage] = useState({ activities: 0, daysUsed: 0, maxActivities: 3 });
+  const [usage, setUsage] = useState({ 
+    activities: 0, 
+    daysUsed: 15, 
+    maxActivities: 3 // Default to free tier
+  });
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showDailySuggestions, setShowDailySuggestions] = useState(false);
+  
+  const { user, subscriptionTiers, loadSubscriptionTiers } = useApi();
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
@@ -21,43 +29,98 @@ export default function SubscriptionSettingsScreen() {
     loadSubscriptionData();
   }, []);
 
-  const loadSubscriptionData = async () => {
-    try {
-      const response = await fetch('/api/subscription');
-      const data = await response.json();
-      
-      setTiers(data.tiers);
-      setCurrentTier(data.currentTier);
-      setUsage(data.usage);
-      setShowUpgradePrompt(data.showUpgradePrompt);
-      setShowDailySuggestions(data.showDailySuggestions);
-    } catch (error) {
-      console.error('Failed to load subscription data:', error);
-    }
-  };
-
-  const handleUpgrade = async (tier: string) => {
-    try {
-      const response = await fetch('/api/subscription/upgrade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        Alert.alert('Success', `Successfully upgraded to ${tiers[tier].name}!`);
-        setCurrentTier(tier);
-        setShowUpgradePrompt(false);
+  // Update usage when tiers are loaded
+  useEffect(() => {
+    if (Object.keys(tiers).length > 0) {
+      const currentTierData = tiers[currentTier];
+      if (currentTierData) {
+        setUsage(prev => ({
+          ...prev,
+          maxActivities: currentTierData.maxActivities === -1 ? 999 : currentTierData.maxActivities
+        }));
       }
-    } catch (error) {
-      Alert.alert('Error', 'Upgrade failed. Please try again.');
+    }
+  }, [tiers, currentTier]);
+
+  const loadSubscriptionData = async () => {
+    await loadSubscriptionTiers();
+    
+    // Convert array to object for easier access
+    const tiersObj: Record<string, SubscriptionTierType> = {};
+    subscriptionTiers.forEach(tier => {
+      tiersObj[tier.id] = tier;
+    });
+    setTiers(tiersObj);
+    
+    // Set usage based on current tier
+    const currentTierData = tiersObj[currentTier];
+    if (currentTierData) {
+      setUsage(prev => ({
+        ...prev,
+        maxActivities: currentTierData.maxActivities === -1 ? 999 : currentTierData.maxActivities
+      }));
     }
   };
 
-  const handleDismissPrompt = () => {
-    setDismissedPrompt(true);
+  const handleUpgrade = (tierId: string) => {
+    Alert.alert(
+      'Upgrade Subscription',
+      `Upgrade to ${tiers[tierId]?.name} plan for $${tiers[tierId]?.price}/month?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Upgrade', 
+          onPress: () => {
+            setCurrentTier(tierId as "free" | "silver" | "gold" | "platinum");
+            setShowUpgradePrompt(false);
+            Alert.alert('Success', 'Subscription upgraded successfully!');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleCancelSubscription = () => {
+    Alert.alert(
+      'Cancel Subscription',
+      'Are you sure you want to cancel your subscription? You will lose access to premium features.',
+      [
+        { text: 'Keep Subscription', style: 'cancel' },
+        { 
+          text: 'Cancel Subscription', 
+          style: 'destructive',
+          onPress: () => {
+            setCurrentTier('free');
+            Alert.alert('Subscription Cancelled', 'Your subscription has been cancelled.');
+          }
+        }
+      ]
+    );
+  };
+
+  const getCurrentTierData = () => {
+    return tiers[currentTier] || tiers['free'] || { maxActivities: 3, maxRadius: 10, features: [] };
+  };
+
+  const getUsagePercentage = () => {
+    const currentTierData = getCurrentTierData();
+    if (currentTierData.maxActivities === -1) return 0;
+    return (usage.activities / currentTierData.maxActivities) * 100;
+  };
+
+  const isNearLimit = () => {
+    const percentage = getUsagePercentage();
+    return percentage >= 80;
+  };
+
+  const getTierDisplayName = (tierId: string) => {
+    const tier = tiers[tierId];
+    return tier ? tier.name : 'Unknown';
+  };
+
+  const getTierPrice = (tierId: string) => {
+    const tier = tiers[tierId];
+    return tier ? `$${tier.price}/month` : 'Free';
   };
 
   return (
@@ -66,71 +129,84 @@ export default function SubscriptionSettingsScreen() {
       <View style={[styles.header, safeArea.header]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <FontAwesome name="arrow-left" size={20} color="#000" />
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Subscription & Billing</Text>
+        <Text style={styles.title}>Subscription</Text>
         <View style={styles.placeholder} />
       </View>
 
-      {/* Current Plan Status */}
-      {usage.activities >= usage.maxActivities && currentTier === 'free' && (
-        <View style={styles.limitBanner}>
-          <FontAwesome name="exclamation-triangle" size={20} color="#fff" />
-          <View style={styles.limitText}>
-            <Text style={styles.limitTitle}>Activity limit reached</Text>
-            <Text style={styles.limitSubtitle}>Upgrade to create more activities</Text>
-          </View>
+      {/* Current Plan */}
+      <View style={styles.currentPlanCard}>
+        <Text style={styles.currentPlanTitle}>Current Plan</Text>
+        <View style={styles.currentPlanInfo}>
+          <Text style={styles.currentPlanName}>{getTierDisplayName(currentTier)}</Text>
+          <Text style={styles.currentPlanPrice}>{getTierPrice(currentTier)}</Text>
         </View>
-      )}
+        {currentTier !== 'free' && (
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={handleCancelSubscription}
+          >
+            <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* Upgrade Prompt */}
-      {showUpgradePrompt && !dismissedPrompt && (
-        <UpgradePrompt
-          onUpgrade={() => handleUpgrade('silver')}
-          onDismiss={handleDismissPrompt}
-          daysUsed={usage.daysUsed}
-        />
-      )}
-
-      {/* Daily Suggestions */}
-      {showDailySuggestions && (
-        <View style={styles.suggestionsCard}>
-          <FontAwesome name="lightbulb-o" size={20} color="#f59e0b" />
-          <View style={styles.suggestionsText}>
-            <Text style={styles.suggestionsTitle}>Daily Suggestions</Text>
-            <Text style={styles.suggestionsSubtitle}>Based on your interests</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Usage Card */}
+      {/* Usage Stats */}
       <View style={styles.usageCard}>
-        <Text style={styles.usageTitle}>Your Usage</Text>
+        <Text style={styles.usageTitle}>Usage This Month</Text>
         <View style={styles.usageStats}>
           <View style={styles.usageItem}>
-            <Text style={styles.usageNumber}>
-              {usage.activities} / {usage.maxActivities === -1 ? '∞' : usage.maxActivities}
-            </Text>
-            <Text style={styles.usageLabel}>Activities Used</Text>
+            <Text style={styles.usageNumber}>{usage.activities}</Text>
+            <Text style={styles.usageLabel}>Activities Created</Text>
           </View>
           <View style={styles.usageItem}>
             <Text style={styles.usageNumber}>{usage.daysUsed}</Text>
             <Text style={styles.usageLabel}>Days Active</Text>
           </View>
         </View>
+        
+        {getCurrentTierData().maxActivities !== -1 && (
+          <View style={styles.usageBar}>
+            <View style={styles.usageBarBackground}>
+              <View 
+                style={[
+                  styles.usageBarFill, 
+                  { width: `${Math.min(getUsagePercentage(), 100)}%` },
+                  isNearLimit() && styles.usageBarFillWarning
+                ]} 
+              />
+            </View>
+            <Text style={styles.usageBarText}>
+              {usage.activities} / {getCurrentTierData().maxActivities} activities
+            </Text>
+          </View>
+        )}
+
+        {isNearLimit() && (
+          <View style={styles.limitWarning}>
+            <FontAwesome name="exclamation-triangle" size={16} color="#ff6b6b" />
+            <Text style={styles.limitWarningText}>
+              You're approaching your activity limit for this month
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Available Plans */}
-      <Text style={styles.sectionTitle}>Available Plans</Text>
-
-      {Object.entries(tiers).map(([key, tier]: [string, any]) => (
-        <SubscriptionTier
-          key={key}
-          tier={key}
-          isActive={currentTier === key}
-          onUpgrade={handleUpgrade}
-          limits={tier}
-        />
-      ))}
+      <View style={styles.plansSection}>
+        <Text style={styles.plansTitle}>Available Plans</Text>
+        {Object.values(tiers).map((tier) => (
+          <SubscriptionTier
+            key={tier.id}
+            tier={tier.id}
+            isActive={currentTier === tier.id}
+            onUpgrade={handleUpgrade}
+            limits={tier}
+            currentUserSubscription={user?.subscription || 'free'}
+          />
+        ))}
+      </View>
 
       {/* Billing Information */}
       <View style={styles.billingCard}>
@@ -152,6 +228,15 @@ export default function SubscriptionSettingsScreen() {
           <FontAwesome name="chevron-right" size={16} color="#ccc" />
         </TouchableOpacity>
       </View>
+
+      {/* Upgrade Prompt */}
+      {(user?.subscription || 'free') === 'free' && !dismissedPrompt && (
+        <UpgradePrompt
+          onUpgrade={() => setShowUpgradePrompt(true)}
+          onDismiss={() => setDismissedPrompt(true)}
+          daysUsed={usage.daysUsed}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -172,59 +257,57 @@ const styles = StyleSheet.create({
     marginBottom: PADDING.content.vertical,
   },
   backButton: {
-    padding: GAPS.small,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backButtonText: {
+    fontSize: FONT_SIZES.md,
+    color: "#000",
+    marginLeft: GAPS.small,
   },
   title: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
   },
   placeholder: {
-    width: 40,
+    width: 60,
   },
-  limitBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ff4444",
+  currentPlanCard: {
+    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.large,
     padding: PADDING.card.horizontal,
     marginBottom: PADDING.content.vertical,
   },
-  limitText: {
-    marginLeft: GAPS.medium,
-    flex: 1,
-  },
-  limitTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: FONT_WEIGHTS.semibold,
-    color: "#fff",
-    marginBottom: GAPS.xs,
-  },
-  limitSubtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: "#ffcccc",
-  },
-  suggestionsCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fef3c7",
-    borderRadius: BORDER_RADIUS.large,
-    padding: PADDING.card.horizontal,
-    marginBottom: PADDING.content.vertical,
-  },
-  suggestionsText: {
-    marginLeft: GAPS.medium,
-    flex: 1,
-  },
-  suggestionsTitle: {
-    fontSize: FONT_SIZES.md,
+  currentPlanTitle: {
+    fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
-    marginBottom: GAPS.xs,
+    marginBottom: GAPS.medium,
   },
-  suggestionsSubtitle: {
-    fontSize: FONT_SIZES.sm,
+  currentPlanInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: GAPS.medium,
+  },
+  currentPlanName: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: "#000",
+  },
+  currentPlanPrice: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.medium,
     color: "#666",
+  },
+  cancelButton: {
+    alignSelf: "flex-start",
+  },
+  cancelButtonText: {
+    fontSize: FONT_SIZES.sm,
+    color: "#ff4444",
+    fontWeight: FONT_WEIGHTS.medium,
   },
   usageCard: {
     backgroundColor: "#f8f9fa",
@@ -241,32 +324,70 @@ const styles = StyleSheet.create({
   usageStats: {
     flexDirection: "row",
     justifyContent: "space-around",
+    marginBottom: GAPS.large,
   },
   usageItem: {
     alignItems: "center",
   },
   usageNumber: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: "#000",
-    marginBottom: GAPS.xs,
+    marginBottom: GAPS.small,
   },
   usageLabel: {
     fontSize: FONT_SIZES.sm,
     color: "#666",
+  },
+  usageBar: {
+    marginBottom: GAPS.medium,
+  },
+  usageBarBackground: {
+    height: 8,
+    backgroundColor: "#e9ecef",
+    borderRadius: 4,
+    marginBottom: GAPS.small,
+  },
+  usageBarFill: {
+    height: 8,
+    backgroundColor: "#10b981",
+    borderRadius: 4,
+  },
+  usageBarFillWarning: {
+    backgroundColor: "#ff6b6b",
+  },
+  usageBarText: {
+    fontSize: FONT_SIZES.sm,
+    color: "#666",
     textAlign: "center",
   },
-  sectionTitle: {
+  limitWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff3cd",
+    padding: GAPS.medium,
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  limitWarningText: {
+    fontSize: FONT_SIZES.sm,
+    color: "#856404",
+    marginLeft: GAPS.small,
+    flex: 1,
+  },
+  plansSection: {
+    marginBottom: PADDING.content.vertical,
+  },
+  plansTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.semibold,
     color: "#000",
-    marginBottom: PADDING.content.horizontal,
+    marginBottom: GAPS.medium,
   },
   billingCard: {
     backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.large,
     padding: PADDING.card.horizontal,
-    marginTop: PADDING.content.vertical,
+    marginBottom: PADDING.content.vertical,
   },
   billingTitle: {
     fontSize: FONT_SIZES.lg,
