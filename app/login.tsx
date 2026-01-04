@@ -5,50 +5,98 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useApi } from "@/contexts/ApiContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isBecomingGuest, setIsBecomingGuest] = useState(false);
+  const [hasNavigated, setHasNavigated] = useState(false);
 
   const router = useRouter();
+  const params = useLocalSearchParams();
   const safeArea = useSafeAreaStyle();
   const { login, register, continueAsGuest, isAuthenticated, isGuest, isLoading } = useApi();
 
   // Redirect if already authenticated or guest
   React.useEffect(() => {
-    if (isAuthenticated || isGuest) {
+    // Only run if we have authentication state and haven't navigated yet
+    // Skip if we're in the process of becoming a guest (continueAsGuest handles navigation)
+    if ((isAuthenticated || isGuest) && !hasNavigated && !isBecomingGuest) {
+      // If guest is trying to access a protected route, don't redirect them back
+      if (isGuest && params.from) {
+        return;
+      }
+      
       // Add a small delay to prevent flicker
       const timer = setTimeout(async () => {
-        // If guest, go directly to main app
+        // If guest, go directly to main app (bypass onboarding)
         if (isGuest) {
+          // console.log('Guest user, redirecting to main app...');
+          setHasNavigated(true);
           router.replace("/(tabs)");
           return;
         }
         
-        // Check if user has completed onboarding
-        const onboardingComplete = await checkOnboardingStatus();
-        if (onboardingComplete) {
-          router.replace("/(tabs)");
-        } else {
-          router.replace("/onboarding");
+        // If authenticated user, check onboarding status
+        if (isAuthenticated) {
+          // console.log('Authenticated user, checking onboarding...');
+          const onboardingComplete = await checkOnboardingStatus();
+          // console.log('Onboarding complete:', onboardingComplete);
+          // console.log('Params from:', params.from);
+          
+          if (onboardingComplete) {
+            // If user came from a protected route, redirect them there
+            if (params.from === 'create-activity') {
+              // console.log('Redirecting to create-activity page...');
+              setHasNavigated(true);
+              router.replace('/create-activity');
+            } else {
+              // console.log('Redirecting to main app...');
+              setHasNavigated(true);
+              router.replace("/(tabs)");
+            }
+          } else {
+            // If user came from a protected route but needs onboarding, 
+            // redirect them to the protected route after onboarding
+            if (params.from === 'create-activity') {
+              // console.log('Redirecting to onboarding, then create-activity...');
+              setHasNavigated(true);
+              router.replace('/onboarding?redirect=create-activity');
+            } else {
+              // console.log('Redirecting to onboarding...');
+              setHasNavigated(true);
+              router.replace("/onboarding");
+            }
+          }
         }
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isGuest, router]);
+  }, [isAuthenticated, isGuest, router, params.from, isBecomingGuest, hasNavigated]);
+
+  // Reset navigation flag when authentication state changes
+  React.useEffect(() => {
+    if (!isAuthenticated && !isGuest) {
+      setHasNavigated(false);
+    }
+  }, [isAuthenticated, isGuest]);
 
   const checkOnboardingStatus = async () => {
     try {
@@ -82,17 +130,17 @@ export default function LoginScreen() {
 
   const handleSubmit = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please fill in all required fields");
+      showAlert("Error", "Please fill in all required fields", "error");
       return;
     }
 
     if (!isLogin && !name) {
-      Alert.alert("Error", "Please enter your name");
+      showAlert("Error", "Please enter your name", "error");
       return;
     }
 
     if (!isLogin && password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      showAlert("Error", "Passwords do not match", "error");
       return;
     }
 
@@ -117,15 +165,15 @@ export default function LoginScreen() {
         // Don't navigate here - let the useEffect handle it
         return;
       } else {
-        Alert.alert("Error", result.error || "Something went wrong");
+        showAlert("Error", result.error || "Something went wrong", "error");
       }
     } catch (error) {
-      Alert.alert("Error", "Network error. Please try again.");
+      showAlert("Error", "Network error. Please try again.", "error");
     }
   };
 
   return (
-    <View style={[styles.container, safeArea.container]}>
+    <View style={[styles.container, safeArea.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -137,13 +185,13 @@ export default function LoginScreen() {
           <View style={[styles.content, safeArea.content]}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <FontAwesome name="users" size={48} color="#000" />
+            <View style={[styles.logoContainer, { backgroundColor: colors.surface }]}>
+              <FontAwesome name="users" size={48} color={colors.foreground} />
             </View>
-            <Text style={styles.title}>
+            <Text style={[styles.title, { color: colors.foreground }]}>
               {isLogin ? "Welcome Back" : "Join Link Up"}
             </Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
               {isLogin
                 ? "Sign in to connect with people around you"
                 : "Create your account to get started"}
@@ -154,12 +202,13 @@ export default function LoginScreen() {
           <View style={styles.form}>
             {!isLogin && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Full Name</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Full Name</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={name}
                   onChangeText={setName}
                   placeholder="Enter your full name"
+                  placeholderTextColor={colors.muted}
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
@@ -167,12 +216,13 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Enter your email"
+                placeholderTextColor={colors.muted}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -180,12 +230,13 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Enter your password"
+                placeholderTextColor={colors.muted}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -194,12 +245,13 @@ export default function LoginScreen() {
 
             {!isLogin && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Confirm Password</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Confirm Password</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm your password"
+                  placeholderTextColor={colors.muted}
                   secureTextEntry
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -208,28 +260,45 @@ export default function LoginScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+              style={[styles.submitButton, { backgroundColor: colors.foreground }, isLoading && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={isLoading}
             >
-              <Text style={styles.submitButtonText}>
+              <Text style={[styles.submitButtonText, { color: colors.background }]}>
                 {isLoading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
               </Text>
             </TouchableOpacity>
 
             {/* Continue as Guest Button */}
             <TouchableOpacity
-              style={styles.guestButton}
-              onPress={continueAsGuest}
+              style={[styles.guestButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
+              onPress={async () => {
+                if (params.from) {
+                  // If trying to access a protected route, show a message
+                  showAlert(
+                    "Authentication Required", 
+                    "You need to create an account to access this feature.", 
+                    "info"
+                  );
+                } else {
+                  // Normal guest flow - let useEffect handle navigation after state is set
+                  setIsBecomingGuest(true);
+                  await continueAsGuest();
+                  setIsBecomingGuest(false);
+                  // useEffect will detect isGuest and navigate
+                }
+              }}
               disabled={isLoading}
             >
-              <Text style={styles.guestButtonText}>Continue as Guest</Text>
+              <Text style={[styles.guestButtonText, { color: colors.foreground }]}>
+                {params.from ? "Create Account to Continue" : "Continue as Guest"}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Toggle Login/Register */}
           <View style={styles.toggleContainer}>
-            <Text style={styles.toggleText}>
+            <Text style={[styles.toggleText, { color: colors.muted }]}>
               {isLogin ? "Don't have an account?" : "Already have an account?"}
             </Text>
             <TouchableOpacity
@@ -242,7 +311,7 @@ export default function LoginScreen() {
                 setConfirmPassword("");
               }}
             >
-              <Text style={styles.toggleButtonText}>
+              <Text style={[styles.toggleButtonText, { color: colors.accent }]}>
                 {isLogin ? "Sign Up" : "Sign In"}
               </Text>
             </TouchableOpacity>
@@ -257,6 +326,16 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </View>
   );
 }
@@ -264,7 +343,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   keyboardContainer: {
     flex: 1,
@@ -281,12 +359,12 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: PADDING.content.vertical * 2,
+    marginTop: PADDING.content.horizontal,
   },
   logoContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#f8f9fa",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: GAPS.large,
@@ -294,13 +372,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZES.xxxl,
     fontWeight: FONT_WEIGHTS.bold,
-    color: "#000",
     marginBottom: GAPS.small,
     textAlign: "center",
   },
   subtitle: {
     fontSize: FONT_SIZES.md,
-    color: "#666",
     textAlign: "center",
     lineHeight: 22,
   },
@@ -314,21 +390,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.medium,
-    color: "#000",
     marginBottom: GAPS.small,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#e9ecef",
     borderRadius: BORDER_RADIUS.medium,
     paddingHorizontal: PADDING.input.horizontal,
     paddingVertical: PADDING.input.vertical,
     fontSize: FONT_SIZES.md,
-    backgroundColor: "#fff",
     minHeight: 56,
   },
   submitButton: {
-    backgroundColor: "#000",
     borderRadius: BORDER_RADIUS.medium,
     paddingVertical: PADDING.button.vertical,
     alignItems: "center",
@@ -337,17 +409,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   submitButtonDisabled: {
-    backgroundColor: "#ccc",
+    opacity: 0.6,
   },
   submitButtonText: {
-    color: "#fff",
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semibold,
   },
   guestButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#000",
     borderRadius: BORDER_RADIUS.medium,
     paddingVertical: PADDING.button.vertical,
     alignItems: "center",
@@ -356,7 +426,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   guestButtonText: {
-    color: "#000",
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semibold,
   },
@@ -368,7 +437,6 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: FONT_SIZES.md,
-    color: "#666",
     marginRight: GAPS.small,
   },
   toggleButton: {
@@ -376,11 +444,9 @@ const styles = StyleSheet.create({
   },
   toggleButtonText: {
     fontSize: FONT_SIZES.md,
-    color: "#000",
     fontWeight: FONT_WEIGHTS.semibold,
   },
   demoContainer: {
-    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     alignItems: "center",
@@ -388,12 +454,10 @@ const styles = StyleSheet.create({
   demoTitle: {
     fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
     marginBottom: GAPS.small,
   },
   demoText: {
     fontSize: FONT_SIZES.xs,
-    color: "#666",
     marginBottom: 2,
   },
 });

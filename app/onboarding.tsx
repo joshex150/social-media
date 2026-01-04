@@ -6,13 +6,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useApi } from "@/contexts/ApiContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 import { PADDING, FONT_SIZES, FONT_WEIGHTS, GAPS } from "@/constants/spacing";
 
 const INTERESTS = [
@@ -21,7 +23,10 @@ const INTERESTS = [
 
 
 export default function OnboardingScreen() {
+  const { colors } = useTheme();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const safeArea = useSafeAreaStyle();
   const { user, updateProfile } = useApi();
   const [step, setStep] = useState(0);
@@ -43,11 +48,11 @@ export default function OnboardingScreen() {
 
   const handleNext = () => {
     if (step === 0 && !profile.location) {
-      Alert.alert('Error', 'Please enter your location');
+      showAlert('Error', 'Please enter your location', 'error');
       return;
     }
     if (step === 1 && profile.interests.length === 0) {
-      Alert.alert('Error', 'Please select at least one interest');
+      showAlert('Error', 'Please select at least one interest', 'error');
       return;
     }
     
@@ -103,22 +108,30 @@ export default function OnboardingScreen() {
       await AsyncStorage.removeItem('isNewUser');
       
       // Show success message
-      Alert.alert(
+      showAlert(
         'Welcome to Link Up!',
         'Your profile has been set up successfully. You can now start connecting with people around you.',
+        'success',
         [
           {
             text: 'Get Started',
             onPress: () => {
-              // Navigate to main app
-              router.replace('/(tabs)');
+              // Navigate to main app or redirect destination
+              // console.log('Onboarding complete, redirect param:', params.redirect);
+              if (params.redirect === 'create-activity') {
+                // console.log('Redirecting to create-activity page...');
+                router.replace('/create-activity');
+              } else {
+                // console.log('Redirecting to main app...');
+                router.replace('/(tabs)');
+              }
             }
           }
         ]
       );
     } catch (error) {
       console.error('Onboarding completion error:', error);
-      Alert.alert('Error', 'Failed to save profile');
+      showAlert('Error', 'Failed to save profile', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -129,16 +142,16 @@ export default function OnboardingScreen() {
       case 0:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.title}>Welcome, {user?.name || 'User'}!</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.foreground }]}>Welcome, {user?.name || 'User'}!</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
               Let's set up your profile to help you connect with people for meaningful activities.
             </Text>
             
             <TextInput
               testID="location-input"
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
               placeholder="Your Location (e.g., New York, NY)"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
               value={profile.location}
               onChangeText={(text) => setProfile({ ...profile, location: text })}
             />
@@ -148,8 +161,8 @@ export default function OnboardingScreen() {
       case 1:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.title}>Select Your Interests</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.foreground }]}>Select Your Interests</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
               Choose activities you enjoy
             </Text>
             
@@ -160,14 +173,16 @@ export default function OnboardingScreen() {
                   testID={`interest-${interest}`}
                   style={[
                     styles.optionButton,
-                    profile.interests.includes(interest) && styles.optionButtonSelected,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    profile.interests.includes(interest) && { backgroundColor: colors.accent, borderColor: colors.accent },
                   ]}
                   onPress={() => handleInterestToggle(interest)}
                 >
                   <Text
                     style={[
                       styles.optionText,
-                      profile.interests.includes(interest) && styles.optionTextSelected,
+                      { color: colors.muted },
+                      profile.interests.includes(interest) && { color: colors.background },
                     ]}
                   >
                     {interest}
@@ -181,16 +196,16 @@ export default function OnboardingScreen() {
       case 2:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.title}>You're All Set!</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.foreground }]}>You're All Set!</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
               Let's start connecting with people around you
             </Text>
             
-            <View style={styles.summaryContainer}>
-              <Text style={styles.summaryTitle}>Your Profile</Text>
-              <Text style={styles.summaryText}>Name: {user?.name || 'User'}</Text>
-              <Text style={styles.summaryText}>Location: {profile.location}</Text>
-              <Text style={styles.summaryText}>
+            <View style={[styles.summaryContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.summaryTitle, { color: colors.foreground }]}>Your Profile</Text>
+              <Text style={[styles.summaryText, { color: colors.muted }]}>Name: {user?.name || 'User'}</Text>
+              <Text style={[styles.summaryText, { color: colors.muted }]}>Location: {profile.location}</Text>
+              <Text style={[styles.summaryText, { color: colors.muted }]}>
                 Interests: {profile.interests.join(', ')}
               </Text>
             </View>
@@ -203,25 +218,25 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Safe Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
           {step > 0 && (
             <TouchableOpacity 
               style={styles.backButton}
               onPress={() => setStep(step - 1)}
             >
-              <FontAwesome name="arrow-left" size={20} color="#000" />
+              <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
             </TouchableOpacity>
           )}
         </View>
-               <Text style={styles.headerTitle}>
+               <Text style={[styles.headerTitle, { color: colors.foreground }]}>
                  {step === 0 ? 'Location' : 
                   step === 1 ? 'Interests' : 'Complete'}
                </Text>
         <View style={styles.headerRight}>
-          <Text style={styles.stepIndicator}>{step + 1}/3</Text>
+          <Text style={[styles.stepIndicator, { color: colors.muted }]}>{step + 1}/3</Text>
         </View>
       </View>
 
@@ -235,7 +250,8 @@ export default function OnboardingScreen() {
                 key={s}
                 style={[
                   styles.progressDot,
-                  s === step && styles.progressDotActive,
+                  { backgroundColor: colors.border },
+                  s === step && { backgroundColor: colors.accent },
                 ]}
               />
             ))}
@@ -243,16 +259,30 @@ export default function OnboardingScreen() {
           
           <TouchableOpacity
             testID={step < 1 ? 'location-continue' : step === 1 ? 'interests-continue' : 'onboarding-complete'}
-            style={[styles.continueButton, isLoading && styles.continueButtonDisabled]}
+            style={[
+              styles.continueButton, 
+              { backgroundColor: colors.accent },
+              isLoading && { backgroundColor: colors.muted }
+            ]}
             onPress={handleNext}
             disabled={isLoading}
           >
-            <Text style={styles.continueButtonText}>
+            <Text style={[styles.continueButtonText, { color: colors.background }]}>
               {isLoading ? 'Saving...' : step === 2 ? 'Get Started' : 'Continue'}
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </View>
   );
 }
@@ -260,7 +290,6 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -269,8 +298,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: PADDING.content.horizontal,
     paddingVertical: PADDING.content.vertical,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#fff',
   },
   headerLeft: {
     width: 40,
@@ -279,7 +306,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
-    color: '#000',
   },
   headerRight: {
     width: 40,
@@ -290,7 +316,6 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     fontSize: FONT_SIZES.sm,
-    color: '#666',
     fontWeight: FONT_WEIGHTS.medium,
   },
   scrollContainer: {
@@ -305,23 +330,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#000',
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 32,
     lineHeight: 24,
   },
   input: {
-    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#000',
     marginBottom: 16,
+    borderWidth: 1,
   },
   optionsContainer: {
     flexDirection: 'row',
@@ -332,37 +354,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  optionButtonSelected: {
-    backgroundColor: '#000',
-    borderColor: '#000',
   },
   optionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
     textTransform: 'capitalize',
   },
-  optionTextSelected: {
-    color: '#fff',
-  },
   summaryContainer: {
-    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     padding: 20,
+    borderWidth: 1,
   },
   summaryTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
     marginBottom: 16,
   },
   summaryText: {
     fontSize: 15,
-    color: '#333',
     marginBottom: 8,
   },
   navigationContainer: {
@@ -378,24 +388,14 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e0e0e0',
-  },
-  progressDotActive: {
-    backgroundColor: '#000',
-    width: 24,
   },
   continueButton: {
-    backgroundColor: '#000',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  continueButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
   continueButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
   },
 });
