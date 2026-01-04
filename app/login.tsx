@@ -274,12 +274,14 @@ export default function LoginScreen() {
               style={[styles.guestButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
               onPress={async () => {
                 if (params.from) {
-                  // If trying to access a protected route, show a message
-                  showAlert(
-                    "Authentication Required", 
-                    "You need to create an account to access this feature.", 
-                    "info"
-                  );
+                  // If trying to access a protected route, switch to registration form
+                  // Creating an account doesn't require authentication
+                  setIsLogin(false);
+                  // Clear form fields
+                  setName("");
+                  setEmail("");
+                  setPassword("");
+                  setConfirmPassword("");
                 } else {
                   // Normal guest flow - let useEffect handle navigation after state is set
                   setIsBecomingGuest(true);
