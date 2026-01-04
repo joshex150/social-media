@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authAPI, activitiesAPI, chatAPI, notificationsAPI, subscriptionAPI, getAuthToken, saveAuthToken, removeAuthToken, type User, type Activity, type Chat, type Notification, type SubscriptionTier, type JoinRequest } from '@/services/api';
 import { useRouter } from 'expo-router';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { useSocket } from '@/hooks/useSocket';
 
 interface ApiContextType {
   // Auth state
@@ -33,7 +35,25 @@ interface ApiContextType {
   refreshData: () => Promise<void>;
 
   // Activity actions
-  createActivity: (activityData: Partial<Activity>) => Promise<{ success: boolean; error?: string }>;
+  createActivity: (activityData: {
+    title: string;
+    description: string;
+    category: 'social' | 'fitness' | 'learning' | 'food' | 'travel' | 'music' | 'sports' | 'tech';
+    location: {
+      name: string;
+      latitude: number;
+      longitude: number;
+      address: string;
+    };
+    date: string;
+    duration: number;
+    maxParticipants: number;
+    radius: number;
+    tags?: string[];
+    imageUrl?: string;
+    chatEnabled?: boolean;
+    isPublic?: boolean;
+  }) => Promise<{ success: boolean; error?: string }>;
   joinActivity: (activityId: string) => Promise<{ success: boolean; error?: string }>;
   leaveActivity: (activityId: string) => Promise<{ success: boolean; error?: string }>;
   sendJoinRequest: (activityId: string, message: string) => Promise<{ success: boolean; error?: string }>;
@@ -42,6 +62,14 @@ interface ApiContextType {
 
   // Chat actions
   sendMessage: (chatId: string, message: string) => Promise<{ success: boolean; error?: string }>;
+  getChatMessages: (chatId: string, page?: number) => Promise<{ success: boolean; messages?: any[]; pagination?: any; error?: string }>;
+  markChatAsRead: (chatId: string) => void;
+  
+  // Socket actions
+  startTyping: (chatId: string) => void;
+  stopTyping: (chatId: string) => void;
+  getTypingUsers: (chatId: string) => string[];
+  isSocketConnected: boolean;
 
   // Notification actions
   markNotificationAsRead: (notificationId: string) => Promise<void>;
@@ -52,7 +80,14 @@ const ApiContext = createContext<ApiContextType | undefined>(undefined);
 export const useApi = () => {
   const context = useContext(ApiContext);
   if (!context) {
-    throw new Error('useApi must be used within an ApiProvider');
+    // Provide more helpful error message with stack trace info
+    const error = new Error('useApi must be used within an ApiProvider');
+    console.error('useApi hook called outside of ApiProvider:', {
+      error,
+      stack: error.stack,
+      // Log component tree if available
+    });
+    throw error;
   }
   return context;
 };
@@ -66,76 +101,175 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Request tracking to prevent infinite loops
+  const [requestInProgress, setRequestInProgress] = useState(false);
+  const [lastRequestTime, setLastRequestTime] = useState(0);
+  const [requestCount, setRequestCount] = useState(0);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const router = useRouter();
+  const errorHandler = useErrorHandler();
   const isAuthenticated = !!user && !!token;
+  const { 
+    socket, 
+    isConnected: isSocketConnected, 
+    sendMessage: socketSendMessage, 
+    startTyping, 
+    stopTyping, 
+    markMessagesAsRead, 
+    onNewMessage, 
+    onUserTyping, 
+    onMessagesRead, 
+    onError, 
+    getTypingUsers 
+  } = useSocket({ token, isAuthenticated });
   
-  // Debug logging
+  // Initialize auth on app start with better error handling
   useEffect(() => {
-    console.log('Auth state changed:', { 
-      hasUser: !!user, 
-      hasToken: !!token, 
-      isAuthenticated 
-    });
-  }, [user, token, isAuthenticated]);
+    let isMounted = true;
+    
+    const initializeWithTimeout = async () => {
+      try {
+        // Add a small delay to prevent race conditions
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        if (!isMounted) return;
+        
+        await Promise.race([
+          initializeAuth(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Auth initialization timeout')), 1500)
+          )
+        ]);
+      } catch (error) {
+        if (isMounted) {
+          console.error('Auth initialization failed or timed out:', error);
+          // Don't crash the app, just set loading to false
+          setIsLoading(false);
+        }
+      }
+    };
 
-  // Initialize auth on app start
-  useEffect(() => {
-    initializeAuth();
+    // Also set a hard timeout to ensure loading never gets stuck
+    const hardTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn('Hard timeout reached, forcing loading to false');
+        setIsLoading(false);
+      }
+    }, 2000);
+
+    initializeWithTimeout().finally(() => {
+      clearTimeout(hardTimeout);
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(hardTimeout);
+    };
   }, []);
 
-  // Load data when authenticated
+  // Load data when authenticated (but only once to prevent infinite loops)
   useEffect(() => {
-    if (isAuthenticated) {
-      loadAllData();
+    if (isAuthenticated && !dataLoaded && !requestInProgress) {
+      // console.log('User authenticated, loading data once...');
+      // Add a small delay to prevent rapid-fire calls
+      const timeoutId = setTimeout(() => {
+        loadAllData();
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, dataLoaded]);
 
   const initializeAuth = async () => {
     try {
-      console.log('Initializing auth...');
+      // console.log('Initializing auth...');
       const savedToken = await getAuthToken();
-      console.log('Saved token found:', !!savedToken);
+      // console.log('Saved token found:', !!savedToken);
       
       if (savedToken) {
         setToken(savedToken);
-        console.log('Token set, fetching user data...');
-        const userResponse = await authAPI.getCurrentUser(savedToken);
-        console.log('User response:', userResponse);
+        // console.log('Token set, attempting to fetch user data...');
         
-        if (userResponse.success && userResponse.data && userResponse.data.user) {
-          setUser(userResponse.data.user);
-          console.log('User set successfully:', userResponse.data.user.name);
-        } else {
-          console.log('Token invalid or user data missing, clearing token');
-          // Token is invalid, remove it
-          await removeAuthToken();
-          setToken(null);
-          setUser(null);
+        try {
+          // Add aggressive timeout to the API call itself
+          const userResponse = await Promise.race([
+            authAPI.getCurrentUser(savedToken),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('User API timeout')), 1000)
+            )
+          ]);
+          
+          // console.log('User response:', userResponse);
+          
+          if (userResponse.success && userResponse.data && userResponse.data.user) {
+            setUser(userResponse.data.user);
+            // console.log('User set successfully:', userResponse.data.user.name);
+          } else {
+            // console.log('Token invalid or user data missing, clearing token');
+            await removeAuthToken();
+            setToken(null);
+            setUser(null);
+          }
+        } catch (apiError) {
+          console.warn('User API call failed, but keeping token for offline mode:', apiError);
+          // Don't clear the token if API fails - user might be offline
+          // Just set a placeholder user
+          setUser({ 
+            id: 'offline-user', 
+            name: 'User', 
+            email: 'user@example.com',
+            joinDate: new Date().toISOString(),
+            subscription: 'free',
+            stats: { 
+              activitiesCreated: 0, 
+              activitiesJoined: 0,
+              connectionsMade: 0,
+              streakDays: 0
+            }
+          });
+          // Set as guest mode so user can still use the app
+          setIsGuest(true);
         }
       } else {
-        console.log('No saved token found');
+        // console.log('No saved token found');
       }
     } catch (error) {
       console.error('Error initializing auth:', error);
-      // Clear any invalid state
-      await removeAuthToken();
-      setToken(null);
-      setUser(null);
+      // Only clear state if it's a critical error, not just API timeout
+      if (error instanceof Error && error.message.includes('timeout')) {
+        // console.log('Auth timeout, but continuing with offline mode');
+      } else {
+        await removeAuthToken();
+        setToken(null);
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
-      console.log('Auth initialization complete');
+      // console.log('Auth initialization complete');
     }
   };
 
   const loadAllData = async () => {
-    if (!token) return;
+    if (!token || dataLoaded) return;
+    
+    // Prevent infinite loops with request deduplication
+    const now = Date.now();
+    if (requestInProgress || (now - lastRequestTime) < 2000) {
+      // console.log('Request already in progress or too recent, skipping...');
+      return;
+    }
+    
+    setRequestInProgress(true);
+    setLastRequestTime(now);
     
     try {
+      // console.log('Loading all data once...');
       await Promise.all([
         loadActivities(),
         loadChats(),
@@ -143,24 +277,82 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
         loadSubscriptionTiers(),
         loadJoinRequests(),
       ]);
+      // console.log('All data loaded successfully');
+      setDataLoaded(true);
     } catch (error) {
       console.error('Error loading data:', error);
+    } finally {
+      setRequestInProgress(false);
     }
   };
 
+  // Socket.io event handlers
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (data: any) => {
+      console.log('New message received:', data);
+      // Update chats list with new message
+      setChats(prevChats => 
+        prevChats.map(chat => 
+          chat.id === data.chatId 
+            ? { 
+                ...chat, 
+                lastMessage: {
+                  text: data.message.text,
+                  sender: data.message.sender.name,
+                  timestamp: data.message.timestamp
+                }
+              }
+            : chat
+        )
+      );
+    };
+
+    const handleUserTyping = (data: any) => {
+      console.log('User typing:', data);
+      // Typing indicators are handled by the useSocket hook
+    };
+
+    const handleMessagesRead = (data: any) => {
+      console.log('Messages read:', data);
+      // Could update read receipts here if needed
+    };
+
+    const handleError = (error: any) => {
+      console.error('Socket error:', error);
+      errorHandler.handleError(new Error(error.message), 'Socket connection error');
+    };
+
+    // Set up event listeners
+    const unsubscribeNewMessage = onNewMessage(handleNewMessage);
+    const unsubscribeUserTyping = onUserTyping(handleUserTyping);
+    const unsubscribeMessagesRead = onMessagesRead(handleMessagesRead);
+    const unsubscribeError = onError(handleError);
+
+    return () => {
+      unsubscribeNewMessage?.();
+      unsubscribeUserTyping?.();
+      unsubscribeMessagesRead?.();
+      unsubscribeError?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
+
   const login = async (email: string, password: string) => {
     try {
-      console.log('Starting login process...');
+      // console.log('Starting login process...');
       setIsLoading(true);
       const response = await authAPI.login({ email, password });
-      console.log('Login response:', response);
+      // console.log('Login response:', response);
       
       if (response.success && response.token) {
-        console.log('Login successful, setting token and user...');
+        // console.log('Login successful, setting token and user...');
         setToken(response.token);
         setUser(response.user);
+        setIsGuest(false); // Guest becomes authenticated user
         await saveAuthToken(response.token);
-        console.log('Login process complete');
+        // console.log('Login process complete');
         return { success: true };
       } else {
         console.error('Login failed:', response);
@@ -168,6 +360,7 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Login error:', error);
+      errorHandler.handleError(error, 'Login');
       return { success: false, error: 'Network error' };
     } finally {
       setIsLoading(false);
@@ -182,6 +375,7 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       if (response.success && response.token) {
         setToken(response.token);
         setUser(response.user);
+        setIsGuest(false); // Guest becomes authenticated user
         await saveAuthToken(response.token);
         return { success: true };
       } else {
@@ -189,6 +383,7 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
         return { success: false, error: response.message || 'Registration failed' };
       }
     } catch (error) {
+      errorHandler.handleError(error, 'Registration');
       return { success: false, error: 'Network error' };
     } finally {
       setIsLoading(false);
@@ -246,8 +441,8 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       await loadActivities();
       await loadSubscriptionTiers();
       
-      // Navigate to main app
-      router.replace("/(tabs)");
+      // Don't navigate here - let the login page useEffect handle navigation
+      // This prevents double navigation
     } catch (error) {
       console.error('Error continuing as guest:', error);
     }
@@ -284,7 +479,7 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     }
   };
 
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -294,23 +489,27 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error loading activities:', error);
+      errorHandler.handleError(error, 'Loading activities');
     }
-  };
+  }, [token, errorHandler]);
 
-  const loadChats = async () => {
+  const loadChats = useCallback(async () => {
     if (!token) return;
     
     try {
       const response = await chatAPI.getChats(token);
       if (response.success) {
-        setChats(response.chats);
+        setChats(response.chats || []);
+      } else {
+        setChats([]);
       }
     } catch (error) {
       console.error('Error loading chats:', error);
+      setChats([]);
     }
-  };
+  }, [token]);
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -321,9 +520,9 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
-  };
+  }, [token]);
 
-  const loadSubscriptionTiers = async () => {
+  const loadSubscriptionTiers = useCallback(async () => {
     try {
       const response = await subscriptionAPI.getTiers();
       if (response.success) {
@@ -332,9 +531,9 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Error loading subscription tiers:', error);
     }
-  };
+  }, []);
 
-  const loadJoinRequests = async () => {
+  const loadJoinRequests = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -345,13 +544,33 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Error loading join requests:', error);
     }
-  };
+  }, [token]);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
+    // Reset data loaded flag for manual refresh
+    setDataLoaded(false);
     await loadAllData();
-  };
+  }, []);
 
-  const createActivity = async (activityData: Partial<Activity>) => {
+  const createActivity = async (activityData: {
+    title: string;
+    description: string;
+    category: 'social' | 'fitness' | 'learning' | 'food' | 'travel' | 'music' | 'sports' | 'tech';
+    location: {
+      name: string;
+      latitude: number;
+      longitude: number;
+      address: string;
+    };
+    date: string;
+    duration: number;
+    maxParticipants: number;
+    radius: number;
+    tags?: string[];
+    imageUrl?: string;
+    chatEnabled?: boolean;
+    isPublic?: boolean;
+  }) => {
     if (!token) return { success: false, error: 'Not authenticated' };
     
     try {
@@ -450,15 +669,39 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     if (!token) return { success: false, error: 'Not authenticated' };
     
     try {
-      const response = await chatAPI.sendMessage(chatId, message, token);
-      if (response.success) {
-        await loadChats(); // Refresh chats list
+      // Use Socket.io for real-time messaging
+      if (isSocketConnected) {
+        socketSendMessage(chatId, message, 'text');
         return { success: true };
       } else {
-        return { success: false, error: response.message || 'Failed to send message' };
+        // Fallback to REST API if Socket.io not connected
+        const response = await chatAPI.sendMessage(chatId, message, token);
+        if (response.success) {
+          await loadChats(); // Refresh chats list
+          return { success: true };
+        } else {
+          return { success: false, error: response.message || 'Failed to send message' };
+        }
       }
     } catch (error) {
       return { success: false, error: 'Network error' };
+    }
+  };
+
+  const getChatMessages = async (chatId: string, page: number = 1) => {
+    if (!token) return { success: false, error: 'Not authenticated' };
+    
+    try {
+      const response = await chatAPI.getMessages(chatId, page, 20, token);
+      return response;
+    } catch (error) {
+      return { success: false, error: 'Network error' };
+    }
+  };
+
+  const markChatAsRead = (chatId: string) => {
+    if (isSocketConnected) {
+      markMessagesAsRead(chatId);
     }
   };
 
@@ -513,6 +756,14 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
 
     // Chat actions
     sendMessage,
+    getChatMessages,
+    markChatAsRead,
+
+    // Socket actions
+    startTyping,
+    stopTyping,
+    getTypingUsers,
+    isSocketConnected,
 
     // Notification actions
     markNotificationAsRead,
