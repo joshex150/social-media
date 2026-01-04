@@ -1,5 +1,5 @@
 // API service for Link Up app
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://linkup-api-66uv.onrender.com/api';
 
 class ApiService {
   constructor() {

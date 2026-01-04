@@ -1,5 +1,5 @@
 // Test script for Link Up API
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://linkup-api-66uv.onrender.com/api';
 
 // Test data
 const testUser = {

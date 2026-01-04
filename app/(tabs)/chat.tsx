@@ -64,17 +64,44 @@ export default function ChatScreen() {
   const loadChatMessages = async (chatId: string, page: number) => {
     try {
       const response = await getChatMessages(chatId, page);
-      if (response.success && response.messages) {
-        if (page === 1) {
-          setMessages(response.messages || []);
+      if (response.success) {
+        const messages = response.messages || response.data?.messages || [];
+        const pagination = response.pagination || response.data?.pagination || {};
+        
+        // Check if there are actually messages returned
+        const hasMessages = messages.length > 0;
+        
+        // Determine if there are more messages
+        // Check multiple possible response structures
+        let hasMoreMessages = false;
+        if (pagination.hasMore !== undefined) {
+          hasMoreMessages = pagination.hasMore && hasMessages;
+        } else if (pagination.totalPages !== undefined && pagination.currentPage !== undefined) {
+          hasMoreMessages = pagination.currentPage < pagination.totalPages && hasMessages;
+        } else if (pagination.pages !== undefined && pagination.page !== undefined) {
+          hasMoreMessages = pagination.page < pagination.pages && hasMessages;
         } else {
-          setMessages(prev => [...(response.messages || []), ...prev]);
+          // If no pagination info, assume no more if we got fewer messages than requested
+          hasMoreMessages = hasMessages && messages.length >= 20;
         }
-        setHasMore(response.pagination?.hasMore || false);
+        
+        if (page === 1) {
+          setMessages(messages);
+        } else {
+          setMessages(prev => [...messages, ...prev]);
+        }
+        setHasMore(hasMoreMessages);
         setCurrentPage(page);
+      } else {
+        // If request failed or no messages, set hasMore to false
+        setHasMore(false);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+      setHasMore(false);
+    } finally {
+      // Always ensure loading state is cleared
+      setIsLoadingMore(false);
     }
   };
 
@@ -82,8 +109,15 @@ export default function ChatScreen() {
     if (!selectedChat || !hasMore || isLoadingMore) return;
     
     setIsLoadingMore(true);
-    await loadChatMessages(selectedChat.id, currentPage + 1);
-    setIsLoadingMore(false);
+    try {
+      await loadChatMessages(selectedChat.id, currentPage + 1);
+    } catch (error) {
+      console.error('Error loading more messages:', error);
+      setHasMore(false);
+    } finally {
+      // Ensure loading state is always cleared
+      setIsLoadingMore(false);
+    }
   };
 
   const handleTyping = (isTyping: boolean) => {

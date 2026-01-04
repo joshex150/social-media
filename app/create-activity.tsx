@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   StyleSheet,
   ScrollView,
@@ -27,7 +27,7 @@ import { useErrorHandler } from "@/hooks/useErrorHandler";
 export default function CreateActivityScreen() {
   const { colors } = useTheme();
   const errorHandler = useErrorHandler();
-  const { isGuest } = useApi();
+  const { isGuest, isAuthenticated, isLoading: authLoading } = useApi();
   const [formData, setFormData] = useState({
     title: "",
     category: "social",
@@ -45,6 +45,7 @@ export default function CreateActivityScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const isSubmittingRef = useRef(false);
   const [alert, setAlert] = useState<{
     visible: boolean;
     title: string;
@@ -67,12 +68,24 @@ export default function CreateActivityScreen() {
   const router = useRouter();
   const { createActivity } = useApi();
 
-  // Redirect guests to login
+  // Redirect guests to login (only after auth state is loaded)
   React.useEffect(() => {
-    if (isGuest) {
+    // Don't redirect while authentication is still loading
+    if (authLoading) {
+      return;
+    }
+
+    // Only redirect if user is actually a guest (not authenticated)
+    if (!isAuthenticated && !isGuest) {
+      // Still loading, wait
+      return;
+    }
+
+    // If user is a guest or not authenticated, redirect to login
+    if (isGuest || !isAuthenticated) {
       router.replace("/login?from=create-activity");
     }
-  }, [isGuest, router]);
+  }, [isGuest, isAuthenticated, authLoading, router]);
 
   const categories = [
     { id: "social", name: "Social", icon: "users" },
@@ -142,16 +155,73 @@ export default function CreateActivityScreen() {
   };
 
   const handleSubmit = async () => {
+    // Prevent multiple submissions
+    if (loading || isSubmittingRef.current) {
+      return;
+    }
+
     if (!formData.title || !formData.description || !formData.location) {
       showAlert("Error", "Please fill in all required fields", "error");
       return;
     }
 
+    // Validate date and time
+    if (!formData.startDate || !formData.startTime) {
+      showAlert("Error", "Please provide both date and time", "error");
+      return;
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(formData.startDate)) {
+      showAlert("Error", "Please enter date in YYYY-MM-DD format", "error");
+      return;
+    }
+
+    // Validate time format (HH:MM)
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (!timeRegex.test(formData.startTime)) {
+      showAlert(
+        "Error",
+        "Please enter time in HH:MM format (24-hour)",
+        "error"
+      );
+      return;
+    }
+
+    // Validate date is not in the past
+    const selectedDate = new Date(
+      `${formData.startDate}T${formData.startTime}`
+    );
+    const now = new Date();
+    if (selectedDate <= now) {
+      showAlert(
+        "Error",
+        "Please select a date and time in the future",
+        "error"
+      );
+      return;
+    }
+
     try {
       setLoading(true);
+      isSubmittingRef.current = true;
 
       // Combine date and time into ISO8601 format
-      const combinedDateTime = `${formData.startDate}T${formData.startTime}:00.000Z`;
+      // Ensure time is properly formatted (HH:MM -> HH:MM:00.000Z)
+      const [hours, minutes] = formData.startTime.split(":");
+      const combinedDateTime = `${formData.startDate}T${hours.padStart(
+        2,
+        "0"
+      )}:${minutes.padStart(2, "0")}:00.000Z`;
+
+      // Validate the combined datetime
+      const testDate = new Date(combinedDateTime);
+      if (isNaN(testDate.getTime())) {
+        showAlert("Error", "Invalid date or time format", "error");
+        setLoading(false);
+        return;
+      }
 
       const activityData = {
         title: formData.title,
@@ -181,6 +251,24 @@ export default function CreateActivityScreen() {
       const result = await createActivity(activityData);
 
       if (result.success) {
+        // Clear form after successful creation to prevent resubmission
+        setFormData({
+          title: "",
+          category: "social",
+          description: "",
+          location: "",
+          address: "",
+          latitude: 9.0765,
+          longitude: 7.3986,
+          maxParticipants: 10,
+          startDate: "",
+          startTime: "",
+          duration: 60,
+          radius: 5,
+          tags: [],
+        });
+        setSelectedTags([]);
+
         showAlert(
           "Success!",
           "Your activity has been created successfully!",
@@ -188,16 +276,22 @@ export default function CreateActivityScreen() {
           [
             {
               text: "OK",
-              onPress: () => router.back(),
+              onPress: () => {
+                setLoading(false);
+                isSubmittingRef.current = false;
+                router.replace("/(tabs)");
+              },
             },
           ]
         );
+        // Don't set loading to false here - navigation will handle it
+        return;
       } else {
-        showAlert(
-          "Error",
-          result.error || "Failed to create activity",
-          "error"
-        );
+        // Display error message - will include validation errors if present
+        const errorMessage = result.error || "Failed to create activity";
+        showAlert("Error", errorMessage, "error");
+        setLoading(false);
+        isSubmittingRef.current = false;
       }
     } catch (error) {
       errorHandler.handleError(error, "Creating activity");
@@ -206,8 +300,8 @@ export default function CreateActivityScreen() {
         "Failed to create activity. Please try again.",
         "error"
       );
-    } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -860,6 +954,7 @@ const styles = StyleSheet.create({
     paddingVertical: PADDING.button.vertical + 8,
     marginTop: PADDING.content.vertical,
     minHeight: 56,
+    marginBottom: MARGIN.section.bottom * 2,
   },
   submitButtonDisabled: {
     opacity: 0.6,

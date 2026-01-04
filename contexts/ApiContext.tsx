@@ -579,10 +579,34 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
         await loadActivities(); // Refresh activities list
         return { success: true };
       } else {
-        return { success: false, error: response.message || 'Failed to create activity' };
+        // Extract error messages from validation errors array
+        let errorMessage = response.message || 'Failed to create activity';
+        if (response.errors && Array.isArray(response.errors) && response.errors.length > 0) {
+          // Combine all validation error messages
+          const errorMessages = response.errors.map((err: any) => {
+            const field = err.path ? err.path.split('.').pop() : 'field';
+            return `${field.charAt(0).toUpperCase() + field.slice(1)}: ${err.msg}`;
+          });
+          errorMessage = errorMessages.join('\n');
+        }
+        return { success: false, error: errorMessage, errors: response.errors };
       }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
+    } catch (error: any) {
+      console.error('Create activity error:', error);
+      let errorMessage = 'Network error';
+      if (error.response?.data) {
+        const data = error.response.data;
+        if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+          const errorMessages = data.errors.map((err: any) => {
+            const field = err.path ? err.path.split('.').pop() : 'field';
+            return `${field.charAt(0).toUpperCase() + field.slice(1)}: ${err.msg}`;
+          });
+          errorMessage = errorMessages.join('\n');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+      }
+      return { success: false, error: errorMessage, errors: error.response?.data?.errors };
     }
   };
 
@@ -693,8 +717,34 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     
     try {
       const response = await chatAPI.getMessages(chatId, page, 20, token);
+      
+      // Transform response to match expected structure
+      if (response.success) {
+        // Handle different response structures
+        const messages = response.messages || response.data?.messages || [];
+        const pagination = response.pagination || response.data?.pagination || {};
+        
+        return {
+          success: true,
+          messages,
+          pagination: {
+            hasMore: pagination.hasMore !== undefined 
+              ? pagination.hasMore 
+              : (pagination.currentPage !== undefined && pagination.totalPages !== undefined
+                  ? pagination.currentPage < pagination.totalPages
+                  : (pagination.page !== undefined && pagination.pages !== undefined
+                      ? pagination.page < pagination.pages
+                      : messages.length >= 20)),
+            currentPage: pagination.currentPage || pagination.page || page,
+            totalPages: pagination.totalPages || pagination.pages || 1,
+            totalMessages: pagination.totalMessages || pagination.total || messages.length
+          }
+        };
+      }
+      
       return response;
     } catch (error) {
+      console.error('Error fetching chat messages:', error);
       return { success: false, error: 'Network error' };
     }
   };

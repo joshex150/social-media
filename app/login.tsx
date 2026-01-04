@@ -28,27 +28,47 @@ export default function LoginScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isBecomingGuest, setIsBecomingGuest] = useState(false);
   const [hasNavigated, setHasNavigated] = useState(false);
+  const guestOnMountRef = React.useRef<boolean | null>(null);
 
   const router = useRouter();
   const params = useLocalSearchParams();
   const safeArea = useSafeAreaStyle();
   const { login, register, continueAsGuest, isAuthenticated, isGuest, isLoading } = useApi();
 
+  // Track if user was already a guest when component mounted (only set once when isGuest first becomes available)
+  React.useEffect(() => {
+    if (guestOnMountRef.current === null && !isLoading) {
+      guestOnMountRef.current = isGuest;
+    }
+  }, [isGuest, isLoading]);
+
   // Redirect if already authenticated or guest
   React.useEffect(() => {
     // Only run if we have authentication state and haven't navigated yet
     // Skip if we're in the process of becoming a guest (continueAsGuest handles navigation)
     if ((isAuthenticated || isGuest) && !hasNavigated && !isBecomingGuest) {
-      // If guest is trying to access a protected route, don't redirect them back
-      if (isGuest && params.from) {
+      // If guest navigated to login page explicitly (no params.from), let them stay
+      // They want to log in, so don't redirect them back
+      // BUT if guestOnMountRef is false, they just clicked "Continue as Guest", so allow redirect
+      if (isGuest && !params.from && guestOnMountRef.current !== false) {
+        // Guest explicitly navigated to login page - let them stay to log in
         return;
       }
       
       // Add a small delay to prevent flicker
       const timer = setTimeout(async () => {
-        // If guest, go directly to main app (bypass onboarding)
-        if (isGuest) {
-          // console.log('Guest user, redirecting to main app...');
+        // If guest just became a guest (wasn't guest on mount), redirect to main app
+        // This handles the "Continue as Guest" flow
+        if (isGuest && !guestOnMountRef.current) {
+          // console.log('Guest user just became guest, redirecting to main app...');
+          setHasNavigated(true);
+          router.replace("/(tabs)");
+          return;
+        }
+        
+        // If guest was already a guest and has params.from (trying to access protected route), redirect back
+        if (isGuest && params.from) {
+          // console.log('Guest user trying to access protected route, redirecting to main app...');
           setHasNavigated(true);
           router.replace("/(tabs)");
           return;
@@ -285,6 +305,8 @@ export default function LoginScreen() {
                 } else {
                   // Normal guest flow - let useEffect handle navigation after state is set
                   setIsBecomingGuest(true);
+                  setHasNavigated(false); // Reset navigation flag to allow redirect
+                  guestOnMountRef.current = false; // Reset ref so redirect logic knows they just became a guest
                   await continueAsGuest();
                   setIsBecomingGuest(false);
                   // useEffect will detect isGuest and navigate

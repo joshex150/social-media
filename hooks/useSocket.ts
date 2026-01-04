@@ -39,7 +39,7 @@ export const useSocket = ({ token, isAuthenticated }: UseSocketParams) => {
   useEffect(() => {
     // Only create socket if authenticated and token exists, and we don't already have one
     if (isAuthenticated && token && !socketRef.current) {
-      const newSocket = io('http://localhost:3001', {
+      const newSocket = io('https://linkup-api-66uv.onrender.com', {
         auth: {
           token: token
         },

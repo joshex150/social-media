@@ -19,6 +19,8 @@ export default function ChatBox({
   const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const loadMoreTimeoutRef = useRef(null);
+  const isLoadingMoreRef = useRef(false);
 
   const handleSend = () => {
     if (message.trim()) {
@@ -60,10 +62,39 @@ export default function ChatBox({
   };
 
   const handleLoadMore = () => {
-    if (hasMore && !isLoadingMore && onLoadMore) {
-      onLoadMore();
+    // Prevent multiple simultaneous calls
+    // Also check hasMore to prevent calling when there's nothing to load
+    if (!hasMore || isLoadingMore || isLoadingMoreRef.current) {
+      return;
     }
+    
+    // Clear any pending load more calls
+    if (loadMoreTimeoutRef.current) {
+      clearTimeout(loadMoreTimeoutRef.current);
+    }
+    
+    // Debounce the load more call
+    loadMoreTimeoutRef.current = setTimeout(() => {
+      // Double-check hasMore before calling (it might have changed)
+      if (hasMore && !isLoadingMore && !isLoadingMoreRef.current && onLoadMore) {
+        isLoadingMoreRef.current = true;
+        onLoadMore();
+        // Reset the flag after a delay to allow the loading state to update
+        setTimeout(() => {
+          isLoadingMoreRef.current = false;
+        }, 500);
+      }
+    }, 300);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (loadMoreTimeoutRef.current) {
+        clearTimeout(loadMoreTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const renderTypingIndicator = () => {
     if (safeTypingUsers.length === 0) return null;
@@ -81,7 +112,8 @@ export default function ChatBox({
   };
 
   const renderFooter = () => {
-    if (!isLoadingMore) return null;
+    // Only show loading indicator if we're actually loading AND there might be more messages
+    if (!isLoadingMore || !hasMore) return null;
     
     return (
       <View style={styles.loadingContainer}>
@@ -133,7 +165,8 @@ export default function ChatBox({
         contentContainerStyle={styles.messagesContainer}
         inverted
         onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.1}
+        onEndReachedThreshold={0.5}
+        removeClippedSubviews={false}
         ListFooterComponent={renderFooter}
         ListHeaderComponent={renderTypingIndicator}
       />
