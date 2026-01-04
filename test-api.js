@@ -56,19 +56,19 @@ async function apiRequest(endpoint, options = {}) {
 
 // Test functions
 async function testHealthCheck() {
-  console.log('🏥 Testing health check...');
+  // console.log('🏥 Testing health check...');
   try {
     const response = await apiRequest('/health');
-    console.log('✅ Health check passed:', response.message);
+    // console.log('✅ Health check passed:', response.message);
     return true;
   } catch (error) {
-    console.log('❌ Health check failed:', error.message);
+    // console.log('❌ Health check failed:', error.message);
     return false;
   }
 }
 
 async function testUserRegistration() {
-  console.log('👤 Testing user registration...');
+  // console.log('👤 Testing user registration...');
   try {
     const response = await apiRequest('/auth/register', {
       method: 'POST',
@@ -77,20 +77,20 @@ async function testUserRegistration() {
     
     if (response.success) {
       authToken = response.data.token;
-      console.log('✅ User registration successful');
+      // console.log('✅ User registration successful');
       return true;
     } else {
-      console.log('❌ User registration failed:', response.message);
+      // console.log('❌ User registration failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ User registration failed:', error.message);
+    // console.log('❌ User registration failed:', error.message);
     return false;
   }
 }
 
 async function testUserLogin() {
-  console.log('🔐 Testing user login...');
+  // console.log('🔐 Testing user login...');
   try {
     const response = await apiRequest('/auth/login', {
       method: 'POST',
@@ -102,37 +102,37 @@ async function testUserLogin() {
     
     if (response.success) {
       authToken = response.data.token;
-      console.log('✅ User login successful');
+      // console.log('✅ User login successful');
       return true;
     } else {
-      console.log('❌ User login failed:', response.message);
+      // console.log('❌ User login failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ User login failed:', error.message);
+    // console.log('❌ User login failed:', error.message);
     return false;
   }
 }
 
 async function testGetCurrentUser() {
-  console.log('👤 Testing get current user...');
+  // console.log('👤 Testing get current user...');
   try {
     const response = await apiRequest('/auth/me');
     if (response.success) {
-      console.log('✅ Get current user successful');
+      // console.log('✅ Get current user successful');
       return true;
     } else {
-      console.log('❌ Get current user failed:', response.message);
+      // console.log('❌ Get current user failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Get current user failed:', error.message);
+    // console.log('❌ Get current user failed:', error.message);
     return false;
   }
 }
 
 async function testCreateActivity() {
-  console.log('🎯 Testing create activity...');
+  // console.log('🎯 Testing create activity...');
   try {
     const response = await apiRequest('/activities', {
       method: 'POST',
@@ -140,106 +140,106 @@ async function testCreateActivity() {
     });
     
     if (response.success) {
-      console.log('✅ Create activity successful');
+      // console.log('✅ Create activity successful');
       return response.data.activity.id;
     } else {
-      console.log('❌ Create activity failed:', response.message);
+      // console.log('❌ Create activity failed:', response.message);
       return null;
     }
   } catch (error) {
-    console.log('❌ Create activity failed:', error.message);
+    // console.log('❌ Create activity failed:', error.message);
     return null;
   }
 }
 
 async function testGetActivities() {
-  console.log('📋 Testing get activities...');
+  // console.log('📋 Testing get activities...');
   try {
     const response = await apiRequest('/activities');
     if (response.success) {
-      console.log(`✅ Get activities successful (${response.data.activities.length} activities)`);
+      // console.log(`✅ Get activities successful (${response.data.activities.length} activities)`);
       return true;
     } else {
-      console.log('❌ Get activities failed:', response.message);
+      // console.log('❌ Get activities failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Get activities failed:', error.message);
+    // console.log('❌ Get activities failed:', error.message);
     return false;
   }
 }
 
 async function testGetActivity(activityId) {
-  console.log('🎯 Testing get single activity...');
+  // console.log('🎯 Testing get single activity...');
   try {
     const response = await apiRequest(`/activities/${activityId}`);
     if (response.success) {
-      console.log('✅ Get single activity successful');
+      // console.log('✅ Get single activity successful');
       return true;
     } else {
-      console.log('❌ Get single activity failed:', response.message);
+      // console.log('❌ Get single activity failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Get single activity failed:', error.message);
+    // console.log('❌ Get single activity failed:', error.message);
     return false;
   }
 }
 
 async function testGetSubscriptionTiers() {
-  console.log('💳 Testing get subscription tiers...');
+  // console.log('💳 Testing get subscription tiers...');
   try {
     const response = await apiRequest('/subscription/tiers');
     if (response.success) {
-      console.log(`✅ Get subscription tiers successful (${response.data.tiers.length} tiers)`);
+      // console.log(`✅ Get subscription tiers successful (${response.data.tiers.length} tiers)`);
       return true;
     } else {
-      console.log('❌ Get subscription tiers failed:', response.message);
+      // console.log('❌ Get subscription tiers failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Get subscription tiers failed:', error.message);
+    // console.log('❌ Get subscription tiers failed:', error.message);
     return false;
   }
 }
 
 async function testGetNotifications() {
-  console.log('🔔 Testing get notifications...');
+  // console.log('🔔 Testing get notifications...');
   try {
     const response = await apiRequest('/notifications');
     if (response.success) {
-      console.log(`✅ Get notifications successful (${response.data.notifications.length} notifications)`);
+      // console.log(`✅ Get notifications successful (${response.data.notifications.length} notifications)`);
       return true;
     } else {
-      console.log('❌ Get notifications failed:', response.message);
+      // console.log('❌ Get notifications failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Get notifications failed:', error.message);
+    // console.log('❌ Get notifications failed:', error.message);
     return false;
   }
 }
 
 async function testGetChats() {
-  console.log('💬 Testing get chats...');
+  // console.log('💬 Testing get chats...');
   try {
     const response = await apiRequest('/chat');
     if (response.success) {
-      console.log(`✅ Get chats successful (${response.data.chats.length} chats)`);
+      // console.log(`✅ Get chats successful (${response.data.chats.length} chats)`);
       return true;
     } else {
-      console.log('❌ Get chats failed:', response.message);
+      // console.log('❌ Get chats failed:', response.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Get chats failed:', error.message);
+    // console.log('❌ Get chats failed:', error.message);
     return false;
   }
 }
 
 // Main test runner
 async function runTests() {
-  console.log('🧪 Starting Link Up API Tests...\n');
+  // console.log('🧪 Starting Link Up API Tests...\n');
   
   const results = {
     healthCheck: false,
@@ -258,47 +258,47 @@ async function runTests() {
 
   // Run tests
   results.healthCheck = await testHealthCheck();
-  console.log('');
+  // console.log('');
 
   results.registration = await testUserRegistration();
-  console.log('');
+  // console.log('');
 
   if (!results.registration) {
     results.login = await testUserLogin();
-    console.log('');
+    // console.log('');
   }
 
   if (authToken) {
     results.getCurrentUser = await testGetCurrentUser();
-    console.log('');
+    // console.log('');
 
     results.createActivity = await testCreateActivity();
     if (results.createActivity) {
       activityId = results.createActivity;
     }
-    console.log('');
+    // console.log('');
 
     results.getActivities = await testGetActivities();
-    console.log('');
+    // console.log('');
 
     if (activityId) {
       results.getActivity = await testGetActivity(activityId);
-      console.log('');
+      // console.log('');
     }
 
     results.getSubscriptionTiers = await testGetSubscriptionTiers();
-    console.log('');
+    // console.log('');
 
     results.getNotifications = await testGetNotifications();
-    console.log('');
+    // console.log('');
 
     results.getChats = await testGetChats();
-    console.log('');
+    // console.log('');
   }
 
   // Print results
-  console.log('📊 Test Results:');
-  console.log('================');
+  // console.log('📊 Test Results:');
+  // console.log('================');
   
   const testNames = {
     healthCheck: 'Health Check',
@@ -319,17 +319,17 @@ async function runTests() {
   Object.entries(results).forEach(([test, passed]) => {
     totalTests++;
     if (passed) passedTests++;
-    console.log(`${passed ? '✅' : '❌'} ${testNames[test]}: ${passed ? 'PASSED' : 'FAILED'}`);
+    // console.log(`${passed ? '✅' : '❌'} ${testNames[test]}: ${passed ? 'PASSED' : 'FAILED'}`);
   });
 
-  console.log('\n📈 Summary:');
-  console.log(`Passed: ${passedTests}/${totalTests} tests`);
-  console.log(`Success Rate: ${Math.round((passedTests / totalTests) * 100)}%`);
+  // console.log('\n📈 Summary:');
+  // console.log(`Passed: ${passedTests}/${totalTests} tests`);
+  // console.log(`Success Rate: ${Math.round((passedTests / totalTests) * 100)}%`);
 
   if (passedTests === totalTests) {
-    console.log('\n🎉 All tests passed! The API is working correctly.');
+    // console.log('\n🎉 All tests passed! The API is working correctly.');
   } else {
-    console.log('\n⚠️  Some tests failed. Please check the API server and database.');
+    // console.log('\n⚠️  Some tests failed. Please check the API server and database.');
   }
 }
 

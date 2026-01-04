@@ -1,28 +1,30 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function UpgradePrompt({ onUpgrade, onDismiss, daysUsed }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container} testID="upgrade-prompt">
-      <Text style={styles.title} testID="prompt-message">
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="upgrade-prompt">
+      <Text style={[styles.title, { color: colors.foreground }]} testID="prompt-message">
         You've been using Link Up for {daysUsed} days. Upgrade for more features!
       </Text>
       
       <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.dismissButton}
+          style={[styles.dismissButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
           onPress={onDismiss}
           testID="prompt-dismiss"
         >
-          <Text style={styles.dismissButtonText}>Maybe Later</Text>
+          <Text style={[styles.dismissButtonText, { color: colors.foreground }]}>Maybe Later</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={styles.upgradeButton}
+          style={[styles.upgradeButton, { backgroundColor: colors.foreground }]}
           onPress={onUpgrade}
           testID="prompt-upgrade"
         >
-          <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+          <Text style={[styles.upgradeButtonText, { color: colors.background }]}>Upgrade Now</Text>
         </TouchableOpacity>
       </View>
     </View>

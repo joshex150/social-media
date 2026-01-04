@@ -28,6 +28,7 @@ import {
   BORDER_RADIUS,
 } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import type { Activity, User } from "@/services/api";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -77,6 +78,7 @@ interface HeatPoint {
 }
 
 export default function MapScreen() {
+  const { colors } = useTheme();
   const userLocation = useUserLocation();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -109,9 +111,7 @@ export default function MapScreen() {
       : MapboxGL.StyleURL.Light
     : null;
 
-  useEffect(() => {
-    loadActivities();
-  }, [loadActivities]);
+  // Activities are loaded centrally by ApiContext
 
   const handleActivitySelect = (activity: Activity) => {
     setSelectedActivity(activity);
@@ -266,28 +266,28 @@ export default function MapScreen() {
 
   // Fallback component for when Mapbox is not available
   const MapFallback = () => (
-    <View style={[styles.map, styles.fallbackMap]}>
+    <View style={[styles.map, styles.fallbackMap, { backgroundColor: colors.background }]}>
       <View style={styles.fallbackContent}>
-        <Text style={styles.fallbackTitle}>Map View</Text>
-        <Text style={styles.fallbackSubtitle}>
+        <Text style={[styles.fallbackTitle, { color: colors.foreground }]}>Map View</Text>
+        <Text style={[styles.fallbackSubtitle, { color: colors.muted }]}>
           {Platform.OS === "ios" ? "iOS Simulator" : "Android Emulator"}{" "}
           detected
         </Text>
-        <Text style={styles.fallbackText}>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>
           Mapbox requires a physical device for full functionality.
         </Text>
-        <Text style={styles.fallbackText}>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>
           Your location: {userLocation.latitude.toFixed(4)},{" "}
           {userLocation.longitude.toFixed(4)}
         </Text>
-        <Text style={styles.fallbackText}>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>
           Friends nearby: {friends.length}
         </Text>
-        <Text style={styles.fallbackText}>Events nearby: {events.length}</Text>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>Events nearby: {events.length}</Text>
         {ghostMode && (
           <View style={styles.ghostModeContainer}>
-            <FontAwesome name="eye-slash" size={16} color="#666" />
-            <Text style={styles.ghostModeText}>Ghost Mode Active</Text>
+            <FontAwesome name="eye-slash" size={16} color={colors.muted} />
+            <Text style={[styles.ghostModeText, { color: colors.muted }]}>Ghost Mode Active</Text>
           </View>
         )}
       </View>
@@ -298,16 +298,17 @@ export default function MapScreen() {
     <View style={styles.container}>
       {/* Search Bar */}
       <View style={[styles.searchContainer, safeArea.header]}>
-        <View style={styles.searchBar}>
+        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <FontAwesome
             name="search"
             size={20}
-            color="#666"
+            color={colors.muted}
             style={styles.searchIcon}
           />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.foreground }]}
             placeholder="Search for a location to create activity..."
+            placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             onSubmitEditing={handleSearchSubmit}
@@ -324,7 +325,7 @@ export default function MapScreen() {
           onPress={() => router.push("/create-activity")}
           style={styles.searchButton}
         >
-          <FontAwesome name="plus" size={24} color="#000" />
+          <FontAwesome name="plus" size={24} color={colors.foreground} />
         </TouchableOpacity>
       </View>
 
@@ -462,7 +463,7 @@ export default function MapScreen() {
       {modalVisible && (
         <View style={styles.modalOverlay}>
           <TouchableOpacity 
-            style={styles.overlayTouchable}
+            style={[styles.overlayTouchable, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
             activeOpacity={1}
             onPress={handleModalClose}
           />
@@ -473,47 +474,48 @@ export default function MapScreen() {
             <Animated.View 
               style={[
                 styles.modalContainer,
+                { backgroundColor: colors.surface },
                 {
                   transform: [{ translateY }],
                 },
               ]}
             >
-              <View style={styles.modalHandle} />
+              <View style={[styles.modalHandle, { backgroundColor: colors.muted }]} />
 
               <ScrollView
                 style={styles.modalContent}
                 showsVerticalScrollIndicator={false}
               >
                 {/* Modal Header */}
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Nearby Activities</Text>
+                <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>Nearby Activities</Text>
                   {/* <Text style={styles.dragHint}>Drag down to close</Text> */}
                 </View>
 
                 {/* Dropped Pin Actions */}
                 {droppedPin && (
-                  <View style={styles.droppedPinSection}>
+                  <View style={[styles.droppedPinSection, { backgroundColor: colors.background, borderColor: colors.border }]}>
                     <View style={styles.droppedPinInfo}>
-                      <FontAwesome name="map-pin" size={16} color="#ff4444" />
-                      <Text style={styles.droppedPinText}>
+                      <FontAwesome name="map-pin" size={16} color={colors.error} />
+                      <Text style={[styles.droppedPinText, { color: colors.muted }]}>
                         Pin dropped at location
                       </Text>
                     </View>
                     <View style={styles.droppedPinActions}>
                       <TouchableOpacity
-                        style={styles.createAtPinButton}
+                        style={[styles.createAtPinButton, { backgroundColor: colors.foreground }]}
                         onPress={handleCreateActivityAtPin}
                       >
-                        <FontAwesome name="plus" size={16} color="#fff" />
-                        <Text style={styles.createAtPinText}>
+                        <FontAwesome name="plus" size={16} color={colors.background} />
+                        <Text style={[styles.createAtPinText, { color: colors.background }]}>
                           Create Activity Here
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.clearPinButton}
+                        style={[styles.clearPinButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                         onPress={clearDroppedPin}
                       >
-                        <FontAwesome name="times" size={16} color="#666" />
+                        <FontAwesome name="times" size={16} color={colors.muted} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -524,7 +526,7 @@ export default function MapScreen() {
                   nearbyActivities.map((activity) => (
                     <TouchableOpacity
                       key={activity._id}
-                      style={styles.nearbyActivityItem}
+                      style={[styles.nearbyActivityItem, { borderBottomColor: colors.border }]}
                       onPress={() => handleActivitySelect(activity)}
                     >
                       <View
@@ -544,13 +546,13 @@ export default function MapScreen() {
                         />
                       </View>
                       <View style={styles.nearbyActivityInfo}>
-                        <Text style={styles.nearbyActivityTitle}>
+                        <Text style={[styles.nearbyActivityTitle, { color: colors.foreground }]}>
                           {activity.title}
                         </Text>
-                        <Text style={styles.nearbyActivityLocation}>
+                        <Text style={[styles.nearbyActivityLocation, { color: colors.muted }]}>
                           {activity.location.name}
                         </Text>
-                        <Text style={styles.nearbyActivityDistance}>
+                        <Text style={[styles.nearbyActivityDistance, { color: colors.muted }]}>
                           {calculateDistance(
                             userLocation.latitude,
                             userLocation.longitude,
@@ -561,25 +563,25 @@ export default function MapScreen() {
                         </Text>
                       </View>
                       <View style={styles.nearbyActivityMeta}>
-                        <Text style={styles.nearbyActivityParticipants}>
+                        <Text style={[styles.nearbyActivityParticipants, { color: colors.muted }]}>
                           {activity.participants.length}/
                           {activity.maxParticipants}
                         </Text>
                         <FontAwesome
                           name="chevron-right"
                           size={14}
-                          color="#ccc"
+                          color={colors.muted}
                         />
                       </View>
                     </TouchableOpacity>
                   ))
                 ) : (
                   <View style={styles.noActivitiesContainer}>
-                    <FontAwesome name="map-marker" size={32} color="#ccc" />
-                    <Text style={styles.noActivitiesTitle}>
+                    <FontAwesome name="map-marker" size={32} color={colors.muted} />
+                    <Text style={[styles.noActivitiesTitle, { color: colors.muted }]}>
                       No nearby activities
                     </Text>
-                    <Text style={styles.noActivitiesSubtitle}>
+                    <Text style={[styles.noActivitiesSubtitle, { color: colors.muted }]}>
                       Long press on the map to create an activity at that
                       location
                     </Text>
@@ -639,7 +641,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
   fallbackMap: {
-    backgroundColor: "#f5f5f5",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -650,23 +651,19 @@ const styles = StyleSheet.create({
   fallbackTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 8,
   },
   fallbackSubtitle: {
     fontSize: 16,
-    color: "#666",
     marginBottom: 16,
   },
   fallbackText: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     marginBottom: 8,
   },
   ghostModeText: {
     fontSize: 16,
-    color: "#999",
     fontStyle: "italic",
     marginTop: 10,
   },
@@ -723,7 +720,6 @@ const styles = StyleSheet.create({
     height: 56,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
     borderRadius: BORDER_RADIUS.large,
     paddingHorizontal: PADDING.input.horizontal,
     paddingVertical: PADDING.input.vertical,
@@ -733,7 +729,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     width: "90%",
   },
   searchIcon: {
@@ -742,7 +737,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: FONT_SIZES.md,
-    color: "#000",
     paddingVertical: 0,
   },
   searchButton: {
@@ -819,7 +813,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: screenHeight * 0.4,
-    backgroundColor: "#fff",
     borderTopLeftRadius: BORDER_RADIUS.large,
     borderTopRightRadius: BORDER_RADIUS.large,
     shadowColor: "#000",
@@ -831,7 +824,6 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: "#ccc",
     borderRadius: 2,
     alignSelf: "center",
     marginTop: GAPS.small,
@@ -964,12 +956,10 @@ const styles = StyleSheet.create({
     marginBottom: GAPS.medium,
     paddingVertical: PADDING.content.vertical * 3,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   modalTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
-    color: "#000",
   },
   dragHint: {
     fontSize: FONT_SIZES.sm,
@@ -978,12 +968,10 @@ const styles = StyleSheet.create({
   },
   // Dropped Pin Section Styles
   droppedPinSection: {
-    backgroundColor: "#fff5f5",
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.content.horizontal,
     marginBottom: GAPS.medium,
     borderWidth: 1,
-    borderColor: "#ffebee",
   },
   droppedPinInfo: {
     flexDirection: "row",
@@ -992,7 +980,6 @@ const styles = StyleSheet.create({
   },
   droppedPinText: {
     fontSize: FONT_SIZES.sm,
-    color: "#666",
     marginLeft: GAPS.small,
   },
   droppedPinActions: {
@@ -1003,7 +990,6 @@ const styles = StyleSheet.create({
   createAtPinButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ff4444",
     paddingVertical: PADDING.button.vertical,
     paddingHorizontal: PADDING.button.horizontal,
     borderRadius: BORDER_RADIUS.medium,
@@ -1011,17 +997,14 @@ const styles = StyleSheet.create({
     marginRight: GAPS.small,
   },
   createAtPinText: {
-    color: "#fff",
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semibold,
     marginLeft: GAPS.small,
   },
   clearPinButton: {
     padding: PADDING.button.vertical,
-    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.medium,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
   },
   // Nearby Activities List Styles
   nearbyActivityItem: {
@@ -1030,7 +1013,6 @@ const styles = StyleSheet.create({
     paddingVertical: PADDING.content.vertical,
     paddingHorizontal: PADDING.content.horizontal,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   nearbyActivityIcon: {
     width: 40,
@@ -1046,17 +1028,14 @@ const styles = StyleSheet.create({
   nearbyActivityTitle: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
     marginBottom: GAPS.small,
   },
   nearbyActivityLocation: {
     fontSize: FONT_SIZES.sm,
-    color: "#666",
     marginBottom: GAPS.small,
   },
   nearbyActivityDistance: {
     fontSize: FONT_SIZES.xs,
-    color: "#999",
   },
   nearbyActivityMeta: {
     alignItems: "center",
@@ -1064,7 +1043,6 @@ const styles = StyleSheet.create({
   },
   nearbyActivityParticipants: {
     fontSize: FONT_SIZES.sm,
-    color: "#666",
     marginBottom: GAPS.small,
   },
   // No Activities Styles
@@ -1075,13 +1053,11 @@ const styles = StyleSheet.create({
   noActivitiesTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.medium,
-    color: "#666",
     marginTop: GAPS.medium,
     marginBottom: GAPS.small,
   },
   noActivitiesSubtitle: {
     fontSize: FONT_SIZES.md,
-    color: "#999",
     textAlign: "center",
     paddingHorizontal: PADDING.content.horizontal,
   },

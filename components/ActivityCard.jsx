@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function ActivityCard({ activity, onJoin, onView }) {
+  const { colors } = useTheme();
   const { _id: id, title, category, participants, maxParticipants, date } = activity;
   
   // Calculate participant count
@@ -19,35 +21,35 @@ export default function ActivityCard({ activity, onJoin, onView }) {
   };
 
   return (
-    <View style={styles.card} testID={`activity-card-${id}`}>
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID={`activity-card-${id}`}>
       <View style={styles.header}>
-        <Text style={styles.title} testID="activity-title">{title}</Text>
-        <Text style={styles.category} testID="activity-category">{category}</Text>
+        <Text style={[styles.title, { color: colors.foreground }]} testID="activity-title">{title}</Text>
+        <Text style={[styles.category, { color: colors.muted }]} testID="activity-category">{category}</Text>
       </View>
       
       <View style={styles.details}>
-        <Text style={styles.distance} testID="activity-distance">{distance}km</Text>
-        <Text style={styles.participants}>
+        <Text style={[styles.distance, { color: colors.foreground }]} testID="activity-distance">{distance}km</Text>
+        <Text style={[styles.participants, { color: colors.foreground }]}>
           {participantCount}/{maxParticipants} participants
         </Text>
-        <Text style={styles.time}>{formatTime(date)}</Text>
+        <Text style={[styles.time, { color: colors.foreground }]}>{formatTime(date)}</Text>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.button, styles.viewButton]}
+          style={[styles.button, styles.viewButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
           onPress={() => onView(id)}
           testID="view-button"
         >
-          <Text style={styles.buttonText}>View</Text>
+          <Text style={[styles.buttonText, { color: colors.foreground }]}>View</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.button, styles.joinButton]}
+          style={[styles.button, styles.joinButton, { backgroundColor: colors.foreground }]}
           onPress={() => onJoin(id)}
           testID="join-button"
         >
-          <Text style={[styles.buttonText, styles.joinButtonText]}>Join</Text>
+          <Text style={[styles.buttonText, styles.joinButtonText, { color: colors.background }]}>Join</Text>
         </TouchableOpacity>
       </View>
     </View>

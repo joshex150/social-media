@@ -62,7 +62,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       await AsyncStorage.setItem('userTier', newTier);
       setTier(newTier);
       
-      const tierConfig = SUBSCRIPTION_TIERS[newTier];
+      const tierConfig = SUBSCRIPTION_TIERS[newTier as keyof typeof SUBSCRIPTION_TIERS];
       setUsage(prev => ({
         ...prev,
         maxActivities: tierConfig.maxActivities,

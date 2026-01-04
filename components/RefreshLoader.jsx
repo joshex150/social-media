@@ -1,18 +1,21 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTheme } from '../contexts/ThemeContext';
 
 const RefreshLoader = ({ 
   refreshing = false, 
   progress = 0, 
   title = "Pull to refresh",
   refreshingTitle = "Refreshing...",
-  color = "#000",
+  color = null,
   size = 20,
   showProgress = true,
   animationType = "spin", // "spin", "pulse", "bounce"
   customIcon = null
 }) => {
+  const { colors } = useTheme();
+  const iconColor = color || colors.foreground;
   const spinValue = useRef(new Animated.Value(0)).current;
   const scaleValue = useRef(new Animated.Value(0.8)).current;
 
@@ -86,7 +89,7 @@ const RefreshLoader = ({
 
           {/* Center Icon with Background Circle */}
           <View style={styles.iconContainer}>
-            <View style={[styles.iconBackground, { backgroundColor: color + '15' }]}>
+            <View style={[styles.iconBackground, { backgroundColor: iconColor + '15' }]}>
               {refreshing ? (
                 <Animated.View
                   style={[
@@ -99,7 +102,7 @@ const RefreshLoader = ({
                     }
                   ]}
                 >
-                  {customIcon || <FontAwesome name="refresh" size={size} color={color} />}
+                  {customIcon || <FontAwesome name="refresh" size={size} color={iconColor} />}
                 </Animated.View>
               ) : (
                 <Animated.View
@@ -112,7 +115,7 @@ const RefreshLoader = ({
                     }
                   ]}
                 >
-                  {customIcon || <FontAwesome name="arrow-down" size={size} color={color} />}
+                  {customIcon || <FontAwesome name="arrow-down" size={size} color={iconColor} />}
                 </Animated.View>
               )}
             </View>

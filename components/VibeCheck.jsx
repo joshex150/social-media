@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function VibeCheck({ onFeedback }) {
+  const { colors } = useTheme();
   const [selected, setSelected] = useState(null);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -32,7 +34,7 @@ export default function VibeCheck({ onFeedback }) {
         }
       }
     } catch (error) {
-      console.log('Error checking VibeCheck visibility:', error);
+      // console.log('Error checking VibeCheck visibility:', error);
     }
   };
 
@@ -43,7 +45,7 @@ export default function VibeCheck({ onFeedback }) {
     try {
       await AsyncStorage.setItem('vibeCheckLastAnswered', Date.now().toString());
     } catch (error) {
-      console.log('Error storing VibeCheck timestamp:', error);
+      // console.log('Error storing VibeCheck timestamp:', error);
     }
     
     // Hide the component immediately after selection
@@ -60,8 +62,8 @@ export default function VibeCheck({ onFeedback }) {
   }
 
   return (
-    <View style={styles.container} testID="vibe-check">
-      <Text style={styles.title}>How are you feeling?</Text>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="vibe-check">
+      <Text style={[styles.title, { color: colors.foreground }]}>How are you feeling?</Text>
       <View style={styles.vibesContainer}>
         {vibes.map((vibe) => (
           <TouchableOpacity
@@ -69,12 +71,13 @@ export default function VibeCheck({ onFeedback }) {
             testID={`vibe-${vibe.id}`}
             style={[
               styles.vibeButton,
-              selected === vibe.id && styles.vibeButtonSelected,
+              { borderColor: colors.border },
+              selected === vibe.id && [styles.vibeButtonSelected, { borderColor: colors.accent, backgroundColor: colors.background }],
             ]}
             onPress={() => handleSelect(vibe.id)}
           >
-            <FontAwesome name={vibe.icon} size={32} color="#000" />
-            <Text style={styles.vibeLabel}>{vibe.label}</Text>
+            <FontAwesome name={vibe.icon} size={32} color={colors.foreground} />
+            <Text style={[styles.vibeLabel, { color: colors.muted }]}>{vibe.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -87,6 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 12,
     padding: 12,
+    paddingVertical: 24,
     marginBottom: 12,
   },
   title: {

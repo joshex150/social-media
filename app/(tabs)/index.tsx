@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, RefreshControl, Dimensions } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, RefreshControl, Dimensions } from "react-native";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { useTheme } from "../../contexts/ThemeContext";
 import { useRouter } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ActivityCard from "@/components/ActivityCard";
 import VibeCheck from "@/components/VibeCheck";
 import RequestBanner from "@/components/RequestBanner";
 import RefreshLoader from "@/components/RefreshLoader";
+import CustomAlert from "@/components/CustomAlert";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
 import type { Activity, JoinRequest, Notification } from "@/services/api";
@@ -21,6 +25,8 @@ interface Stats {
 }
 
 export default function HomeScreen() {
+  const errorHandler = useErrorHandler();
+  const { colors } = useTheme();
   const [stats, setStats] = useState<Stats>({
     totalActivities: 0,
     totalConnections: 0,
@@ -30,6 +36,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
@@ -45,13 +52,9 @@ export default function HomeScreen() {
     respondToJoinRequest
   } = useApi();
 
+
   // Load data from API
   const loadData = async () => {
-    await Promise.all([
-      loadActivities(),
-      loadNotifications(),
-    ]);
-
     // Calculate stats from current user data
     if (user) {
       setStats({
@@ -95,22 +98,23 @@ export default function HomeScreen() {
     try {
       const result = await respondToJoinRequest(requestId, action);
       if (result.success) {
-        Alert.alert(
+        showAlert(
           'Join Request',
           `Request ${action === 'accept' ? 'accepted' : 'rejected'} successfully!`,
-          [{ text: 'OK' }]
+          'success'
         );
       } else {
-        Alert.alert('Error', result.error || 'Failed to process request');
+        showAlert('Error', result.error || 'Failed to process request', 'error');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to process request');
+      errorHandler.handleError(error, 'Processing join request');
+      showAlert('Error', 'Failed to process request', 'error');
     }
   };
 
   const handleVibeFeedback = async (vibe: string) => {
     setVibeFeedback(vibe);
-    Alert.alert('Thank you!', 'Your feedback has been recorded.');
+    showAlert('Thank you!', 'Your feedback has been recorded.', 'success');
   };
 
   const getUnreadNotificationsCount = () => {
@@ -152,12 +156,12 @@ export default function HomeScreen() {
     try {
       const result = await joinActivity(activityId);
       if (result.success) {
-        Alert.alert('Success', 'You have joined the activity!');
+        showAlert('Success', 'You have joined the activity!', 'success');
       } else {
-        Alert.alert('Error', result.error || 'Failed to join activity');
+        showAlert('Error', result.error || 'Failed to join activity', 'error');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to join activity');
+      showAlert('Error', 'Failed to join activity', 'error');
     }
   }, [joinActivity]);
 
@@ -166,7 +170,7 @@ export default function HomeScreen() {
   }, [router]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Custom Refresh Loader - Only show when actively refreshing */}
       {refreshing && (
         <View style={styles.refreshLoaderContainer}>
@@ -175,7 +179,7 @@ export default function HomeScreen() {
             progress={refreshProgress}
             title=""
             refreshingTitle="Refreshing..."
-            color="#000"
+            color={null}
             size={20}
             showProgress={true}
             animationType="spin"
@@ -201,25 +205,27 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, safeArea.header]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.title}>Welcome back!</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>Welcome back!</Text>
         </View>
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => router.push('/system-notifications')}
-        >
-          <View style={styles.notificationButtonIcon}>
-            <FontAwesome name="bell" size={20} color="#000" />
-            {getUnreadNotificationsCount() > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
-                  {getUnreadNotificationsCount()}
-                </Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => router.push('/system-notifications')}
+          >
+            <View style={styles.notificationButtonIcon}>
+              <FontAwesome name="bell" size={20} color={colors.foreground} />
+              {getUnreadNotificationsCount() > 0 && (
+                <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
+                  <Text style={[styles.notificationBadgeText, { color: colors.background }]}>
+                    {getUnreadNotificationsCount()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={styles.subtitle}>Connect with people around you</Text>
+      <Text style={[styles.subtitle, { color: colors.muted }]}>Connect with people around you</Text>
 
       {/* Stats Cards - Redesigned */}
       <View style={styles.statsContainer}>
@@ -228,7 +234,7 @@ export default function HomeScreen() {
           <View style={[styles.mainStatsCard, styles.primaryCard]}>
             <View style={styles.cardHeader}>
               <View style={styles.mainStatsIconContainer}>
-                <FontAwesome name="calendar" size={24} color="#fff" />
+                <FontAwesome name="calendar" size={24} color={colors.background} />
               </View>
               <View style={styles.cardBadge}>
                 <Text style={styles.badgeText}>Total</Text>
@@ -242,11 +248,11 @@ export default function HomeScreen() {
           
           <View style={[styles.mainStatsCard, styles.secondaryCard]}>
             <View style={styles.cardHeader}>
-              <View style={[styles.mainStatsIconContainer, { backgroundColor: "#e9ecef" }]}>
-                <FontAwesome name="users" size={24} color="#000" />
+              <View style={[styles.mainStatsIconContainer, { backgroundColor: colors.surface }]}>
+                <FontAwesome name="users" size={24} color={colors.foreground} />
               </View>
-              <View style={[styles.cardBadge, { backgroundColor: "#e9ecef" }]}>
-                <Text style={[styles.badgeText, { color: "#000" }]}>Network</Text>
+              <View style={[styles.cardBadge, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.badgeText, { color: colors.foreground }]}>Network</Text>
               </View>
             </View>
             <View style={styles.cardContent}>
@@ -260,7 +266,7 @@ export default function HomeScreen() {
         {/* <View style={styles.secondaryStatsRow}>
           <View style={[styles.secondaryStatsCard, styles.streakCard]}>
             <View style={styles.secondaryIconContainer}>
-              <FontAwesome name="fire" size={18} color="#000" />
+              <FontAwesome name="fire" size={18} color={colors.foreground} />
             </View>
             <View style={styles.secondaryContent}>
               <Text style={styles.secondaryNumber}>{stats.streakDays}</Text>
@@ -270,7 +276,7 @@ export default function HomeScreen() {
           
           <View style={[styles.secondaryStatsCard, styles.weekCard]}>
             <View style={styles.secondaryIconContainer}>
-              <FontAwesome name="line-chart" size={18} color="#000" />
+              <FontAwesome name="line-chart" size={18} color={colors.foreground} />
             </View>
             <View style={styles.secondaryContent}>
               <Text style={styles.secondaryNumber}>{stats.thisWeekActivities}</Text>
@@ -280,7 +286,7 @@ export default function HomeScreen() {
           
           <View style={[styles.secondaryStatsCard, styles.achievementCard]}>
             <View style={styles.secondaryIconContainer}>
-              <FontAwesome name="trophy" size={18} color="#000" />
+              <FontAwesome name="trophy" size={18} color={colors.foreground} />
             </View>
             <View style={styles.secondaryContent}>
               <Text style={styles.secondaryNumber}>12</Text>
@@ -316,7 +322,7 @@ export default function HomeScreen() {
       {/* Upcoming Activities */}
       <View style={styles.activitiesSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Upcoming Activities</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming Activities</Text>
           <TouchableOpacity
             style={styles.seeAllButton}
             onPress={() => router.push('/explore')}
@@ -336,7 +342,7 @@ export default function HomeScreen() {
           ))
         ) : (
           <View style={styles.emptyState}>
-            <FontAwesome name="bullseye" size={48} color="#ccc" />
+            <FontAwesome name="bullseye" size={48} color={colors.muted} />
             <Text style={styles.emptyTitle}>No upcoming activities</Text>
             <Text style={styles.emptySubtitle}>Check out the Explore tab to find activities</Text>
             <TouchableOpacity
@@ -353,7 +359,7 @@ export default function HomeScreen() {
       {notifications?.length > 0 && (
         <View style={styles.notificationsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Notifications</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Notifications</Text>
             <TouchableOpacity 
               style={styles.seeAllButton}
               onPress={() => router.push('/system-notifications')}
@@ -371,7 +377,7 @@ export default function HomeScreen() {
                         notification.type === 'new_activity' ? 'plus-circle' : 'trophy'
                   }
                   size={20}
-                  color="#000"
+                  color={colors.foreground}
                 />
               </View>
               <View style={styles.notificationContent}>
@@ -387,25 +393,35 @@ export default function HomeScreen() {
 
       {/* Quick Actions */}
       <View style={styles.quickActionsSection}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
         <View style={styles.quickActionsGrid}>
           <TouchableOpacity
-            style={styles.quickActionButton}
+            style={[styles.quickActionButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/create-activity')}
           >
-            <FontAwesome name="plus" size={24} color="#000" />
-            <Text style={styles.quickActionText}>Create Activity</Text>
+            <FontAwesome name="plus" size={24} color={colors.foreground} />
+            <Text style={[styles.quickActionText, { color: colors.foreground }]}>Create Activity</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.quickActionButton}
+            style={[styles.quickActionButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/explore')}
           >
-            <FontAwesome name="search" size={24} color="#000" />
-            <Text style={styles.quickActionText}>Find Friends</Text>
+            <FontAwesome name="search" size={24} color={colors.foreground} />
+            <Text style={[styles.quickActionText, { color: colors.foreground }]}>Find Friends</Text>
           </TouchableOpacity>
         </View>
       </View>
       </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </View>
   );
 }
@@ -413,7 +429,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   scrollView: {
     flex: 1,
@@ -441,14 +456,17 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: GAPS.small,
+  },
   title: {
     fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
-    color: "#000",
   },
   subtitle: {
     fontSize: FONT_SIZES.md,
-    color: "#666",
     marginBottom: PADDING.content.vertical,
   },
   notificationButton: {
@@ -461,7 +479,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -8,
     right: -8,
-    backgroundColor: "#ff4444",
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -469,7 +486,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   notificationBadgeText: {
-    color: "#fff",
     fontSize: FONT_SIZES.xs,
     fontWeight: FONT_WEIGHTS.bold,
   },
@@ -732,20 +748,18 @@ const styles = StyleSheet.create({
   quickActionsGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginTop: GAPS.large
   },
   quickActionButton: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     alignItems: "center",
     marginHorizontal: GAPS.small,
     borderWidth: 1,
-    borderColor: "#e9ecef",
   },
   quickActionText: {
     fontSize: FONT_SIZES.sm,
-    color: "#000",
     marginTop: GAPS.small,
     fontWeight: FONT_WEIGHTS.medium,
   },

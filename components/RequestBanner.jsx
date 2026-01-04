@@ -1,31 +1,33 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function RequestBanner({ request, onAccept, onReject }) {
+  const { colors } = useTheme();
   const { id, userName, message } = request;
 
   return (
-    <View style={styles.banner} testID="request-banner">
+    <View style={[styles.banner, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="request-banner">
       <View style={styles.content}>
-        <Text style={styles.userName} testID="request-user">{userName}</Text>
-        <Text style={styles.message} testID="request-message">{message}</Text>
+        <Text style={[styles.userName, { color: colors.foreground }]} testID="request-user">{userName}</Text>
+        <Text style={[styles.message, { color: colors.muted }]} testID="request-message">{message}</Text>
       </View>
       
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.button, styles.rejectButton]}
+          style={[styles.button, styles.rejectButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
           onPress={() => onReject(id)}
           testID="reject-button"
         >
-          <Text style={styles.rejectText}>Reject</Text>
+          <Text style={[styles.rejectText, { color: colors.foreground }]}>Reject</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.button, styles.acceptButton]}
+          style={[styles.button, styles.acceptButton, { backgroundColor: colors.foreground }]}
           onPress={() => onAccept(id)}
           testID="accept-button"
         >
-          <Text style={styles.acceptText}>Accept</Text>
+          <Text style={[styles.acceptText, { color: colors.background }]}>Accept</Text>
         </TouchableOpacity>
       </View>
     </View>

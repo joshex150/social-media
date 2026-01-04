@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Conditional Mapbox import for simulator compatibility
 let MapboxGL;
@@ -19,21 +20,22 @@ try {
 }
 
 export default function MapView({ event, participants }) {
+  const { colors } = useTheme();
   const { location, latitude, longitude } = event;
 
   // Fallback component for when Mapbox is not available
   const MapFallback = () => (
-    <View style={[styles.map, styles.fallbackMap]} testID="map-fallback">
+    <View style={[styles.map, styles.fallbackMap, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="map-fallback">
       <View style={styles.fallbackContent}>
-        <Text style={styles.fallbackTitle}>Event Location</Text>
-        <Text style={styles.fallbackText}>{location}</Text>
-        <Text style={styles.fallbackText}>
+        <Text style={[styles.fallbackTitle, { color: colors.foreground }]}>Event Location</Text>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>{location}</Text>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>
           Coordinates: {latitude.toFixed(4)}, {longitude.toFixed(4)}
         </Text>
-        <Text style={styles.fallbackText}>
+        <Text style={[styles.fallbackText, { color: colors.muted }]}>
           {participants.length} participants
         </Text>
-        <Text style={styles.fallbackSubtext}>
+        <Text style={[styles.fallbackSubtext, { color: colors.muted }]}>
           Map view requires a physical device
         </Text>
       </View>
@@ -41,9 +43,9 @@ export default function MapView({ event, participants }) {
   );
 
   return (
-    <View style={styles.container} testID="map-view">
-      <Text style={styles.location} testID="event-location">{location}</Text>
-      <Text style={styles.participants} testID="participants-count">
+    <View style={[styles.container, { backgroundColor: colors.background }]} testID="map-view">
+      <Text style={[styles.location, { color: colors.foreground }]} testID="event-location">{location}</Text>
+      <Text style={[styles.participants, { color: colors.muted }]} testID="participants-count">
         {participants.length} participants
       </Text>
       

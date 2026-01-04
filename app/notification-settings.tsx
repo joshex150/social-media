@@ -3,9 +3,11 @@ import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Switch } from "re
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 
 export default function NotificationSettingsScreen() {
+  const { colors } = useTheme();
   const [notifications, setNotifications] = useState({
     pushNotifications: true,
     activityInvites: true,
@@ -93,45 +95,49 @@ export default function NotificationSettingsScreen() {
   ];
 
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={20} color="#000" />
+          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={styles.title}>Notifications</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Notifications</Text>
         <View style={styles.placeholder} />
       </View>
 
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+
       {/* Description */}
-      <Text style={styles.description}>
+      <Text style={[styles.description, { color: colors.muted }]}>
         Choose what notifications you want to receive and how you want to receive them.
       </Text>
 
       {/* Notification Groups */}
       {notificationGroups.map((group, groupIndex) => (
-        <View key={groupIndex} style={styles.group}>
-          <Text style={styles.groupTitle}>{group.title}</Text>
+        <View key={groupIndex} style={[styles.group, {  borderColor: colors.border }]}>
+          <Text style={[styles.groupTitle, { color: colors.foreground }]}>{group.title}</Text>
           
           {group.items.map((item, itemIndex) => (
             <View key={item.key} style={[
               styles.notificationItem,
+              { backgroundColor: colors.background, borderColor: colors.border },
               itemIndex === group.items.length - 1 && styles.lastItem
             ]}>
               <View style={styles.notificationLeft}>
-                <View style={styles.notificationIcon}>
-                  <FontAwesome name={item.icon as any} size={20} color="#000" />
+                <View style={[styles.notificationIcon, { backgroundColor: colors.foreground }]}>
+                  <FontAwesome name={item.icon as any} size={20} color={colors.background} />
                 </View>
                 <View style={styles.notificationText}>
-                  <Text style={styles.notificationTitle}>{item.title}</Text>
-                  <Text style={styles.notificationSubtitle}>{item.subtitle}</Text>
+                  <Text style={[styles.notificationTitle, { color: colors.foreground }]}>{item.title}</Text>
+                  <Text style={[styles.notificationSubtitle, { color: colors.muted }]}>{item.subtitle}</Text>
                 </View>
               </View>
               <Switch
                 value={notifications[item.key as keyof typeof notifications]}
                 onValueChange={() => handleToggle(item.key)}
-                trackColor={{ false: "#e9ecef", true: "#000" }}
-                thumbColor={notifications[item.key as keyof typeof notifications] ? "#fff" : "#fff"}
+                trackColor={{ false: colors.border, true: colors.foreground }}
+                thumbColor={notifications[item.key as keyof typeof notifications] ? colors.background : colors.muted}
               />
             </View>
           ))}
@@ -139,44 +145,56 @@ export default function NotificationSettingsScreen() {
       ))}
 
       {/* Notification Schedule */}
-      <View style={styles.group}>
-        <Text style={styles.groupTitle}>Notification Schedule</Text>
-        <TouchableOpacity style={styles.scheduleItem}>
+      <View style={[styles.group, {  borderColor: colors.border }]}>
+        <Text style={[styles.groupTitle, { color: colors.foreground }]}>Notification Schedule</Text>
+        <TouchableOpacity style={[styles.scheduleItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.scheduleLeft}>
-            <View style={styles.notificationIcon}>
-              <FontAwesome name="clock-o" size={20} color="#000" />
+            <View style={[styles.notificationIcon, { backgroundColor: colors.foreground }]}>
+              <FontAwesome name="clock-o" size={20} color={colors.background} />
             </View>
             <View style={styles.notificationText}>
-              <Text style={styles.notificationTitle}>Quiet Hours</Text>
-              <Text style={styles.notificationSubtitle}>10:00 PM - 8:00 AM</Text>
+              <Text style={[styles.notificationTitle, { color: colors.foreground }]}>Quiet Hours</Text>
+              <Text style={[styles.notificationSubtitle, { color: colors.muted }]}>10:00 PM - 8:00 AM</Text>
             </View>
           </View>
-          <FontAwesome name="chevron-right" size={16} color="#ccc" />
+          <FontAwesome name="chevron-right" size={16} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
       {/* Save Button */}
-      <TouchableOpacity style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Save Changes</Text>
+      <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.foreground }]}>
+        <Text style={[styles.saveButtonText, { color: colors.background }]}>Save Changes</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
+    paddingTop: 124, // Account for fixed header + safe area + extra spacing
+    paddingBottom: PADDING.content.vertical,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: PADDING.content.vertical,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+    marginTop: PADDING.content.vertical,
   },
   backButton: {
     padding: GAPS.small,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTheme } from '../contexts/ThemeContext';
 
 const shouldShowUpgradeButton = (tier, currentUserSubscription) => {
   const tierOrder = ['free', 'silver', 'gold', 'platinum'];
@@ -10,22 +11,23 @@ const shouldShowUpgradeButton = (tier, currentUserSubscription) => {
 };
 
 export default function SubscriptionTier({ tier, isActive, onUpgrade, limits, currentUserSubscription }) {
+  const { colors } = useTheme();
   const { name, price, maxActivities, maxRadius, features } = limits;
 
   return (
-    <View style={[styles.container, isActive && styles.activeContainer]} testID={`tier-${tier}`}>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }, isActive && [styles.activeContainer, { borderColor: colors.accent }]]} testID={`tier-${tier}`}>
       <View style={styles.header}>
-        <Text style={styles.tierName} testID="tier-name">{name}</Text>
-        {isActive && <Text style={styles.activeBadge}>Current</Text>}
+        <Text style={[styles.tierName, { color: colors.foreground }]} testID="tier-name">{name}</Text>
+        {isActive && <Text style={[styles.activeBadge, { color: colors.background, backgroundColor: colors.accent }]}>Current</Text>}
       </View>
       
-      <Text style={styles.price} testID="tier-price">{price}</Text>
+      <Text style={[styles.price, { color: colors.foreground }]} testID="tier-price">{price}</Text>
       
       <View style={styles.limits}>
-        <Text style={styles.limitText} testID="tier-activities">
+        <Text style={[styles.limitText, { color: colors.muted }]} testID="tier-activities">
           {maxActivities === -1 ? 'Unlimited' : maxActivities} activities
         </Text>
-        <Text style={styles.limitText} testID="tier-radius">
+        <Text style={[styles.limitText, { color: colors.muted }]} testID="tier-radius">
           {maxRadius === -1 ? 'Unlimited' : `${maxRadius}km`} radius
         </Text>
       </View>
@@ -34,8 +36,8 @@ export default function SubscriptionTier({ tier, isActive, onUpgrade, limits, cu
         <View style={styles.features}>
           {features.map((feature, index) => (
             <View key={index} style={styles.featureItem}>
-              <FontAwesome name="check" size={14} color="#10b981" />
-              <Text style={styles.featureText}>{feature}</Text>
+              <FontAwesome name="check" size={14} color={colors.accent} />
+              <Text style={[styles.featureText, { color: colors.foreground }]}>{feature}</Text>
             </View>
           ))}
         </View>
@@ -43,11 +45,11 @@ export default function SubscriptionTier({ tier, isActive, onUpgrade, limits, cu
 
       {!isActive && shouldShowUpgradeButton(tier, currentUserSubscription) && (
         <TouchableOpacity
-          style={styles.upgradeButton}
+          style={[styles.upgradeButton, { backgroundColor: colors.foreground }]}
           onPress={() => onUpgrade(tier)}
           testID="upgrade-button"
         >
-          <Text style={styles.upgradeButtonText}>Upgrade</Text>
+          <Text style={[styles.upgradeButtonText, { color: colors.background }]}>Upgrade</Text>
         </TouchableOpacity>
       )}
     </View>

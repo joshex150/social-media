@@ -1,7 +1,7 @@
 // API service for Link Up app
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'https://linkup-backend-mu.vercel.app/api';
+const API_BASE_URL = 'https://linkup-api-66uv.onrender.com/api';
 
 export interface User {
   id: string;
@@ -132,7 +132,7 @@ export const authAPI = {
         body: JSON.stringify(userData),
       });
       const data = await response.json();
-      console.log('Register response:', data);
+      // console.log('Register response:', data);
       
       // Transform the response to match frontend expectations
       if (data.success && data.data) {
@@ -157,7 +157,7 @@ export const authAPI = {
         body: JSON.stringify(credentials),
       });
       const data = await response.json();
-      console.log('Login response:', data);
+      // console.log('Login response:', data);
       
       // Transform the response to match frontend expectations
       if (data.success && data.data) {
@@ -179,7 +179,7 @@ export const authAPI = {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await response.json();
-    console.log('getCurrentUser response:', data);
+    // console.log('getCurrentUser response:', data);
     return data;
   },
 
@@ -194,7 +194,7 @@ export const authAPI = {
         body: JSON.stringify(profileData),
       });
       const data = await response.json();
-      console.log('Update profile response:', data);
+      // console.log('Update profile response:', data);
       return data;
     } catch (error) {
       console.error('Update profile API error:', error);
@@ -213,7 +213,7 @@ export const authAPI = {
         body: JSON.stringify(passwordData),
       });
       const data = await response.json();
-      console.log('Update password response:', data);
+      // console.log('Update password response:', data);
       return data;
     } catch (error) {
       console.error('Update password API error:', error);
@@ -224,10 +224,25 @@ export const authAPI = {
 
 // Activities API
 export const activitiesAPI = {
-  getActivities: async (token: string, params?: { radius?: number; category?: string }) => {
+  getActivities: async (token: string, params?: { 
+    radius?: number; 
+    category?: string; 
+    latitude?: number; 
+    longitude?: number; 
+    search?: string; 
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => {
     const queryParams = new URLSearchParams();
     if (params?.radius) queryParams.append('radius', params.radius.toString());
     if (params?.category) queryParams.append('category', params.category);
+    if (params?.latitude) queryParams.append('latitude', params.latitude.toString());
+    if (params?.longitude) queryParams.append('longitude', params.longitude.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
     
     const response = await fetch(`${API_BASE_URL}/activities?${queryParams}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -238,7 +253,8 @@ export const activitiesAPI = {
     if (data.success && data.data) {
       return {
         success: true,
-        activities: data.data.activities
+        activities: data.data.activities,
+        pagination: data.data.pagination
       };
     }
     return data;
@@ -251,7 +267,25 @@ export const activitiesAPI = {
     return response.json();
   },
 
-  createActivity: async (activityData: Partial<Activity>, token: string) => {
+  createActivity: async (activityData: {
+    title: string;
+    description: string;
+    category: 'social' | 'fitness' | 'learning' | 'food' | 'travel' | 'music' | 'sports' | 'tech';
+    location: {
+      name: string;
+      latitude: number;
+      longitude: number;
+      address: string;
+    };
+    date: string;
+    duration: number;
+    maxParticipants: number;
+    radius: number;
+    tags?: string[];
+    imageUrl?: string;
+    chatEnabled?: boolean;
+    isPublic?: boolean;
+  }, token: string) => {
     const response = await fetch(`${API_BASE_URL}/activities`, {
       method: 'POST',
       headers: { 
@@ -280,7 +314,7 @@ export const activitiesAPI = {
   },
 
   sendJoinRequest: async (activityId: string, message: string, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/activities/${activityId}/join-request`, {
+    const response = await fetch(`${API_BASE_URL}/activities/${activityId}/request`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -302,6 +336,36 @@ export const activitiesAPI = {
     const response = await fetch(`${API_BASE_URL}/activities/requests/${requestId}/${action}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  updateActivity: async (activityId: string, activityData: Partial<Activity>, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/activities/${activityId}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify(activityData),
+    });
+    return response.json();
+  },
+
+  deleteActivity: async (activityId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/activities/${activityId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  getUserActivities: async (userId: string, type: 'created' | 'joined' = 'created', token?: string) => {
+    const headers: any = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/activities/user/${userId}?type=${type}`, {
+      headers,
     });
     return response.json();
   },
@@ -343,12 +407,54 @@ export const chatAPI = {
     });
     return response.json();
   },
+
+  getMessages: async (chatId: string, page: number = 1, limit: number = 50, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/chat/${chatId}/messages?page=${page}&limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  markAsRead: async (chatId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/chat/${chatId}/read`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  createChatForActivity: async (activityId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/chat/activity/${activityId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  leaveChat: async (chatId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/chat/${chatId}/leave`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
 };
 
 // Notifications API
 export const notificationsAPI = {
-  getNotifications: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/notifications`, {
+  getNotifications: async (token: string, params?: { 
+    page?: number; 
+    limit?: number; 
+    type?: string; 
+    isRead?: boolean; 
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.isRead !== undefined) queryParams.append('isRead', params.isRead.toString());
+    
+    const response = await fetch(`${API_BASE_URL}/notifications?${queryParams}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await response.json();
@@ -357,7 +463,8 @@ export const notificationsAPI = {
     if (data.success && data.data) {
       return {
         success: true,
-        notifications: data.data.notifications
+        notifications: data.data.notifications,
+        pagination: data.data.pagination
       };
     }
     return data;
@@ -366,6 +473,37 @@ export const notificationsAPI = {
   markAsRead: async (notificationId: string, token: string) => {
     const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
       method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  getUnreadCount: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/notifications/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  markAllAsRead: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  deleteNotification: async (notificationId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  clearAllNotifications: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/notifications/clear-all`, {
+      method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.json();
@@ -406,14 +544,65 @@ export const subscriptionAPI = {
     });
     return response.json();
   },
+
+  createCustomer: async (email: string, name: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/subscription/create-customer`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ email, name }),
+    });
+    return response.json();
+  },
+
+  createSubscription: async (tier: string, paymentMethodId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/subscription/create`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ tier, paymentMethodId }),
+    });
+    return response.json();
+  },
+
+  updateSubscription: async (tier: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/subscription/update`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ tier }),
+    });
+    return response.json();
+  },
+
+  cancelSubscription: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/subscription/cancel`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  getBillingHistory: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/subscription/billing-history`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
 };
 
 // Helper function to get auth token from storage
 export const getAuthToken = async (): Promise<string | null> => {
   try {
-    console.log('Getting auth token from storage...');
+    // console.log('Getting auth token from storage...');
     const token = await AsyncStorage.getItem('authToken');
-    console.log('Retrieved token:', token ? 'Token found' : 'No token found');
+    // console.log('Retrieved token:', token ? 'Token found' : 'No token found');
     return token;
   } catch (error) {
     console.error('Error getting auth token:', error);
@@ -428,9 +617,9 @@ export const saveAuthToken = async (token: string): Promise<void> => {
       console.warn('Invalid token provided to saveAuthToken:', token);
       return;
     }
-    console.log('Saving auth token to storage...');
+    // console.log('Saving auth token to storage...');
     await AsyncStorage.setItem('authToken', token);
-    console.log('Auth token saved successfully');
+    // console.log('Auth token saved successfully');
   } catch (error) {
     console.error('Error saving auth token:', error);
   }

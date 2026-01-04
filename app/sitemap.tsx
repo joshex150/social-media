@@ -3,9 +3,11 @@ import { StyleSheet, ScrollView, View, Text, TouchableOpacity } from "react-nati
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 
 export default function SitemapScreen() {
+  const { colors } = useTheme();
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
 
@@ -165,72 +167,81 @@ export default function SitemapScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <FontAwesome name="arrow-left" size={20} color="#000" />
+          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={styles.title}>Sitemap</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Sitemap</Text>
         <View style={styles.placeholder} />
       </View>
 
       {/* Sitemap Content */}
-      <View style={styles.sitemapContent}>
-        <Text style={styles.description}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.sitemapContent}>
+        <Text style={[styles.description, { color: colors.muted }]}>
           Navigate to any section of the app. Tap any item to go directly to that page.
         </Text>
 
         {sitemapSections.map((section, sectionIndex) => (
-          <View key={sectionIndex} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+          <View key={sectionIndex} style={[styles.section, {  borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{section.title}</Text>
             
             <View style={styles.sectionContainer}>
               {section.items.map((item) => (
                 <TouchableOpacity 
                   key={item.id} 
-                  style={styles.sitemapItem} 
+                  style={[styles.sitemapItem, { backgroundColor: colors.background, borderColor: colors.border }]} 
                   onPress={() => handleNavigation(item.route)}
                 >
                   <View style={styles.sitemapLeft}>
-                    <View style={styles.sitemapIcon}>
-                      <FontAwesome name={item.icon as any} size={20} color="#000" />
+                    <View style={[styles.sitemapIcon, { backgroundColor: colors.foreground }]}>
+                      <FontAwesome name={item.icon as any} size={20} color={colors.background} />
                     </View>
                     <View style={styles.sitemapText}>
-                      <Text style={styles.sitemapTitle}>{item.title}</Text>
-                      <Text style={styles.sitemapSubtitle}>{item.subtitle}</Text>
+                      <Text style={[styles.sitemapTitle, { color: colors.foreground }]}>{item.title}</Text>
+                      <Text style={[styles.sitemapSubtitle, { color: colors.muted }]}>{item.subtitle}</Text>
                     </View>
                   </View>
-                  <FontAwesome name="chevron-right" size={16} color="#ccc" />
+                  <FontAwesome name="chevron-right" size={16} color={colors.muted} />
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         ))}
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     paddingBottom: PADDING.content.vertical * 2,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: PADDING.content.horizontal,
     paddingVertical: PADDING.content.vertical,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    marginTop: PADDING.content.vertical,
   },
   backButton: {
     padding: GAPS.small,
@@ -238,18 +249,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
-    color: "#000",
   },
   placeholder: {
     width: 40,
   },
   sitemapContent: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingTop: PADDING.content.vertical,
+    paddingTop: 124, // Account for fixed header + safe area + extra spacing
   },
   description: {
     fontSize: FONT_SIZES.md,
-    color: "#666",
     lineHeight: 22,
     marginBottom: GAPS.large,
     textAlign: "center",
@@ -260,11 +269,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
-    color: "#000",
     marginBottom: GAPS.medium,
   },
   sectionContainer: {
-    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.content.horizontal,
   },
@@ -274,7 +281,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: PADDING.content.vertical,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   sitemapLeft: {
     flexDirection: "row",
@@ -285,7 +291,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     marginRight: GAPS.medium,
@@ -301,12 +306,10 @@ const styles = StyleSheet.create({
   sitemapTitle: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semibold,
-    color: "#000",
     marginBottom: GAPS.small,
   },
   sitemapSubtitle: {
     fontSize: FONT_SIZES.sm,
-    color: "#666",
     lineHeight: 18,
   },
 });

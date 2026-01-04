@@ -1,77 +1,181 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
+import React, { Component, ReactNode } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
-import { ExternalLink } from './ExternalLink';
-import { MonoText } from './StyledText';
-import { Text, View } from './Themed';
-
-import Colors from '@/constants/Colors';
-
-export default function EditScreenInfo({ path }: { path: string }) {
-  return (
-    <View>
-      <View style={styles.getStartedContainer}>
-        <Text
-          style={styles.getStartedText}
-          lightColor="rgba(0,0,0,0.8)"
-          darkColor="rgba(255,255,255,0.8)">
-          Open up the code for this screen:
-        </Text>
-
-        <View
-          style={[styles.codeHighlightContainer, styles.homeScreenFilename]}
-          darkColor="rgba(255,255,255,0.05)"
-          lightColor="rgba(0,0,0,0.05)">
-          <MonoText>{path}</MonoText>
-        </View>
-
-        <Text
-          style={styles.getStartedText}
-          lightColor="rgba(0,0,0,0.8)"
-          darkColor="rgba(255,255,255,0.8)">
-          Change any of the text, save the file, and your app will automatically update.
-        </Text>
-      </View>
-
-      <View style={styles.helpContainer}>
-        <ExternalLink
-          style={styles.helpLink}
-          href="https://docs.expo.io/get-started/create-a-new-app/#opening-the-app-on-your-phonetablet">
-          <Text style={styles.helpLinkText} lightColor={Colors.light.tint}>
-            Tap here if your app doesn't automatically update after making changes
-          </Text>
-        </ExternalLink>
-      </View>
-    </View>
-  );
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: any) => void;
 }
 
+interface State {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: any;
+}
+
+class ErrorBoundaryClass extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return {
+      hasError: true,
+      error,
+      errorInfo: null,
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    this.setState({
+      error,
+      errorInfo,
+    });
+
+    // Call custom error handler if provided
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
+  }
+
+  handleRetry = () => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      // Use custom fallback if provided
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      // Default error UI - will be themed by wrapper
+      return (
+        <ThemedErrorUI 
+          error={this.state.error}
+          errorInfo={this.state.errorInfo}
+          onRetry={this.handleRetry}
+        />
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Themed error UI component
+const ThemedErrorUI = ({ error, errorInfo, onRetry }: { error: Error | null; errorInfo: any; onRetry: () => void }) => {
+  // Fallback colors in case theme context is not available
+  const fallbackColors = {
+    background: '#ffffff',
+    foreground: '#000000',
+    muted: '#666666',
+    surface: '#f5f5f5',
+    error: '#ff6b6b',
+  };
+
+  let colors = fallbackColors;
+  
+  try {
+    const theme = useTheme();
+    colors = theme.colors;
+  } catch (error) {
+    // Theme context not available, use fallback colors
+    console.warn('Theme context not available in ErrorBoundary, using fallback colors');
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.errorContainer}>
+        <FontAwesome name="exclamation-triangle" size={48} color={colors.error} />
+        <Text style={[styles.title, { color: colors.foreground }]}>Oops! Something went wrong</Text>
+        <Text style={[styles.message, { color: colors.muted }]}>
+          We're sorry, but something unexpected happened. Please try again.
+        </Text>
+        
+        {__DEV__ && error && (
+          <ScrollView style={[styles.debugContainer, { backgroundColor: colors.surface }]} showsVerticalScrollIndicator={true}>
+            <Text style={[styles.debugTitle, { color: colors.foreground }]}>Debug Information:</Text>
+            <Text style={[styles.debugText, { color: colors.muted }]}>{error.toString()}</Text>
+            {errorInfo && (
+              <Text style={[styles.debugText, { color: colors.muted }]}>
+                {errorInfo.componentStack}
+              </Text>
+            )}
+          </ScrollView>
+        )}
+        
+        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.foreground }]} onPress={onRetry}>
+          <Text style={[styles.retryButtonText, { color: colors.background }]}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+export const ErrorBoundary = ErrorBoundaryClass;
+
 const styles = StyleSheet.create({
-  getStartedContainer: {
+  container: {
+    flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 50,
+    padding: 20,
   },
-  homeScreenFilename: {
-    marginVertical: 7,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
   },
-  codeHighlightContainer: {
-    borderRadius: 3,
-    paddingHorizontal: 4,
-  },
-  getStartedText: {
-    fontSize: 17,
+  message: {
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
     lineHeight: 24,
-    textAlign: 'center',
   },
-  helpContainer: {
-    marginTop: 15,
-    marginHorizontal: 20,
-    alignItems: 'center',
+  debugContainer: {
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 8,
+    width: '100%',
+    height: '40%',
   },
-  helpLink: {
-    paddingVertical: 15,
+  debugTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
-  helpLinkText: {
-    textAlign: 'center',
+  debugText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
+
+export default ErrorBoundary;

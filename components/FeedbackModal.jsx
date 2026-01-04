@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTheme } from '../contexts/ThemeContext';
 
 const EmotionSelector = ({ onSelect, selected }) => {
+  const { colors } = useTheme();
   const emotions = [
     { id: 'happy', icon: 'smile-o', label: 'Happy' },
     { id: 'neutral', icon: 'meh-o', label: 'Neutral' },
@@ -19,12 +21,13 @@ const EmotionSelector = ({ onSelect, selected }) => {
           testID={`emotion-${emotion.id}`}
           style={[
             styles.emotionButton,
-            selected === emotion.id && styles.emotionButtonSelected,
+            { borderColor: colors.border },
+            selected === emotion.id && [styles.emotionButtonSelected, { borderColor: colors.accent, backgroundColor: colors.background }],
           ]}
           onPress={() => onSelect(emotion.id)}
         >
-          <FontAwesome name={emotion.icon} size={32} color="#000" />
-          <Text style={styles.emotionLabel}>{emotion.label}</Text>
+          <FontAwesome name={emotion.icon} size={32} color={colors.foreground} />
+          <Text style={[styles.emotionLabel, { color: colors.muted }]}>{emotion.label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -32,9 +35,10 @@ const EmotionSelector = ({ onSelect, selected }) => {
 };
 
 const RatingSlider = ({ value, onValueChange, label }) => {
+  const { colors } = useTheme();
   return (
     <View style={styles.ratingContainer} testID="rating-slider">
-      <Text style={styles.ratingLabel} testID="rating-label">{label}</Text>
+      <Text style={[styles.ratingLabel, { color: colors.foreground }]} testID="rating-label">{label}</Text>
       <View style={styles.ratingButtons}>
         {[1, 2, 3, 4, 5].map((rating) => (
           <TouchableOpacity
@@ -42,14 +46,16 @@ const RatingSlider = ({ value, onValueChange, label }) => {
             testID={`rating-${rating}`}
             style={[
               styles.ratingButton,
-              value === rating && styles.ratingButtonSelected,
+              { borderColor: colors.border },
+              value === rating && [styles.ratingButtonSelected, { borderColor: colors.accent, backgroundColor: colors.background }],
             ]}
             onPress={() => onValueChange(rating)}
           >
             <Text
               style={[
                 styles.ratingText,
-                value === rating && styles.ratingTextSelected,
+                { color: colors.foreground },
+                value === rating && [styles.ratingTextSelected, { color: colors.background }],
               ]}
             >
               {rating}
@@ -57,12 +63,13 @@ const RatingSlider = ({ value, onValueChange, label }) => {
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={styles.ratingValue} testID="rating-value">{value}/5</Text>
+      <Text style={[styles.ratingValue, { color: colors.muted }]} testID="rating-value">{value}/5</Text>
     </View>
   );
 };
 
 export default function FeedbackModal({ visible, event, onClose, onSubmit }) {
+  const { colors } = useTheme();
   const [emotion, setEmotion] = useState(null);
   const [rating, setRating] = useState(3);
   const [comments, setComments] = useState('');
@@ -117,19 +124,19 @@ export default function FeedbackModal({ visible, event, onClose, onSubmit }) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modal} testID="feedback-modal">
+      <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.modal, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="feedback-modal">
           <TouchableOpacity
             style={styles.closeButton}
             onPress={onClose}
             testID="close-button"
           >
-            <FontAwesome name="times" size={20} color="#666" />
+            <FontAwesome name="times" size={20} color={colors.muted} />
           </TouchableOpacity>
 
-          <Text style={styles.title}>How was your experience?</Text>
-          <Text style={styles.eventTitle}>{event?.title}</Text>
-          <Text style={styles.participantCount}>
+          <Text style={[styles.title, { color: colors.foreground }]}>How was your experience?</Text>
+          <Text style={[styles.eventTitle, { color: colors.foreground }]}>{event?.title}</Text>
+          <Text style={[styles.participantCount, { color: colors.muted }]}>
             {event?.participants?.length || 0} participants
           </Text>
 
@@ -143,27 +150,27 @@ export default function FeedbackModal({ visible, event, onClose, onSubmit }) {
 
           <TextInput
             testID="comments-input"
-            style={styles.commentsInput}
+            style={[styles.commentsInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
             placeholder="Add comments (optional)"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             value={comments}
             onChangeText={setComments}
             multiline
             numberOfLines={4}
           />
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+            style={[styles.submitButton, { backgroundColor: colors.foreground }, loading && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={loading}
             testID="submit-button"
           >
             {loading ? (
-              <ActivityIndicator testID="loading-indicator" color="#fff" />
+              <ActivityIndicator testID="loading-indicator" color={colors.background} />
             ) : (
-              <Text style={styles.submitButtonText}>Submit Feedback</Text>
+              <Text style={[styles.submitButtonText, { color: colors.background }]}>Submit Feedback</Text>
             )}
           </TouchableOpacity>
         </View>
