@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, Modal, TextInput, Platform, KeyboardAvoidingView, Switch } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Modal, TextInput, Platform, KeyboardAvoidingView, Switch } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { ThemeToggle } from "@/components";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 import type { User } from "@/services/api";
 
 export default function ProfileScreen() {
+  const { colors } = useTheme();
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -28,14 +33,16 @@ export default function ProfileScreen() {
 
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
-  const { user, logout, updateProfile, updatePassword } = useApi();
+  const { user, logout, updateProfile, updatePassword, isAuthenticated, isGuest } = useApi();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const handleLogout = () => {
-    Alert.alert(
+    showAlert(
       'Logout',
       'Are you sure you want to logout?',
+      'warning',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         { 
           text: 'Logout', 
           style: 'destructive',
@@ -48,6 +55,13 @@ export default function ProfileScreen() {
   };
 
   const handleEditProfile = () => {
+    // Don't allow guest users to edit profile
+    if (isGuest) {
+      showAlert('Login Required', 'Please login to edit your profile', 'info');
+      router.push('/login');
+      return;
+    }
+    
     if (user) {
       setEditName(user.name || '');
       setEditEmail(user.email || '');
@@ -69,9 +83,13 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleLogin = () => {
+    router.push('/login');
+  };
+
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+      showAlert('Error', 'Please enter your name', 'error');
       return;
     }
 
@@ -79,17 +97,17 @@ export default function ProfileScreen() {
     const hasPasswordFields = currentPassword.trim() || newPassword.trim() || confirmPassword.trim();
     if (hasPasswordFields) {
       if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-        Alert.alert('Error', 'Please fill in all password fields or leave them empty');
+        showAlert('Error', 'Please fill in all password fields or leave them empty', 'error');
         return;
       }
 
       if (newPassword !== confirmPassword) {
-        Alert.alert('Error', 'New passwords do not match');
+        showAlert('Error', 'New passwords do not match', 'error');
         return;
       }
 
       if (newPassword.length < 6) {
-        Alert.alert('Error', 'New password must be at least 6 characters');
+        showAlert('Error', 'New password must be at least 6 characters', 'error');
         return;
       }
     }
@@ -108,7 +126,7 @@ export default function ProfileScreen() {
 
       const profileResult = await updateProfile(profileData);
       if (!profileResult.success) {
-        Alert.alert('Error', profileResult.error || 'Failed to update profile');
+        showAlert('Error', profileResult.error || 'Failed to update profile', 'error');
         setIsLoading(false);
         return;
       }
@@ -121,145 +139,192 @@ export default function ProfileScreen() {
         });
 
         if (!passwordResult.success) {
-          Alert.alert('Error', passwordResult.error || 'Failed to update password');
+          showAlert('Error', passwordResult.error || 'Failed to update password', 'error');
           setIsLoading(false);
           return;
         }
       }
 
-      Alert.alert('Success', 'Profile updated successfully');
+      showAlert('Success', 'Profile updated successfully', 'success');
       setShowEditModal(false);
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      showAlert('Error', 'Failed to update profile', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
 
-  const settingsItems = [
+  // Filter settings items based on authentication status
+  const allSettingsItems = [
     {
       id: 'edit-profile',
       title: 'Edit Profile',
       subtitle: 'Update your personal information',
       icon: 'edit',
-      onPress: handleEditProfile
+      onPress: handleEditProfile,
+      requiresAuth: true // Only show for authenticated users
     },
     {
       id: 'subscription',
       title: 'Subscription & Billing',
       subtitle: 'Manage your plan and payments',
       icon: 'credit-card',
-      onPress: () => router.push('/subscription-settings' as any)
+      onPress: () => router.push('/subscription-settings' as any),
+      requiresAuth: true // Only show for authenticated users
     },
     {
       id: 'notifications',
       title: 'Notifications',
       subtitle: 'Control your notification preferences',
       icon: 'bell',
-      onPress: () => router.push('/notification-settings' as any)
+      onPress: () => router.push('/notification-settings' as any),
+      requiresAuth: false // Available to all
     },
     {
       id: 'privacy',
       title: 'Privacy & Security',
       subtitle: 'Manage your privacy settings',
       icon: 'shield',
-      onPress: () => router.push('/privacy-settings' as any)
+      onPress: () => router.push('/privacy-settings' as any),
+      requiresAuth: false // Available to all
     },
     {
       id: 'help',
       title: 'Help & Support',
       subtitle: 'Get help and contact support',
       icon: 'question-circle',
-      onPress: () => router.push('/help-support' as any)
+      onPress: () => router.push('/help-support' as any),
+      requiresAuth: false // Available to all
     },
     {
       id: 'about',
       title: 'About',
       subtitle: 'App version and information',
       icon: 'info-circle',
-      onPress: () => router.push('/about' as any)
+      onPress: () => router.push('/about' as any),
+      requiresAuth: false // Available to all
     },
     {
       id: 'sitemap',
       title: 'Sitemap',
       subtitle: 'Navigate to all app sections',
       icon: 'sitemap',
-      onPress: () => router.push('/sitemap' as any)
+      onPress: () => router.push('/sitemap' as any),
+      requiresAuth: false // Available to all
     }
   ];
 
+  // Filter settings items based on authentication
+  const settingsItems = allSettingsItems.filter(item => {
+    if (item.requiresAuth) {
+      return isAuthenticated && !isGuest;
+    }
+    return true;
+  });
+
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
-        <Text style={styles.title}>Profile</Text>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.foreground }]}>Profile</Text>
+        <ThemeToggle />
       </View>
 
-      {/* User Profile Card */}
-      <TouchableOpacity style={styles.profileCard} onPress={handleEditProfile} activeOpacity={0.8}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <FontAwesome name="user" size={40} color="#fff" />
-          </View>
-          <View style={styles.editButton}>
-            <FontAwesome name="camera" size={16} color="#fff" />
-          </View>
-        </View>
-        <Text style={styles.userName}>{user?.name || 'Loading...'}</Text>
-        <Text style={styles.userEmail}>{user?.email || 'Loading...'}</Text>
-        <Text style={styles.joinDate}>Member since {user?.joinDate || 'Loading...'}</Text>
-        <View style={styles.editProfileHint}>
-          <Text style={styles.editProfileHintText}>Tap to edit profile</Text>
-          <FontAwesome name="chevron-right" size={12} color="#999" />
-        </View>
-      </TouchableOpacity>
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
 
-      {/* Stats Row */}
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{user?.stats?.activitiesCreated || 0}</Text>
-          <Text style={styles.statLabel}>Created</Text>
+      {/* Show login prompt for guests, profile card for authenticated users */}
+      {isGuest || !isAuthenticated ? (
+        <View style={[styles.guestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.avatarContainer}>
+            <View style={[styles.avatar, { backgroundColor: colors.foreground }]}>
+              <FontAwesome name="user" size={40} color={colors.background} />
+            </View>
+          </View>
+          <Text style={[styles.guestTitle, { color: colors.foreground }]}>Guest User</Text>
+          <Text style={[styles.guestSubtitle, { color: colors.muted }]}>
+            Login to access your profile, edit settings, and save your preferences
+          </Text>
+          <TouchableOpacity 
+            style={[styles.loginButton, { backgroundColor: colors.accent }]} 
+            onPress={handleLogin}
+            activeOpacity={0.8}
+          >
+            <FontAwesome name="sign-in" size={18} color={colors.background} />
+            <Text style={[styles.loginButtonText, { color: colors.background }]}>Login</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{user?.stats?.activitiesJoined || 0}</Text>
-          <Text style={styles.statLabel}>Joined</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{user?.stats?.connectionsMade || 0}</Text>
-          <Text style={styles.statLabel}>Connections</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{user?.stats?.streakDays || 0}</Text>
-          <Text style={styles.statLabel}>Day Streak</Text>
-        </View>
-      </View>
-
-      {/* Settings Section */}
-      <Text style={styles.sectionTitle}>Settings</Text>
-      
-      <View style={styles.settingsContainer}>
-        {settingsItems.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.settingItem} onPress={item.onPress}>
-            <View style={styles.settingLeft}>
-              <View style={styles.settingIcon}>
-                <FontAwesome name={item.icon as any} size={20} color="#000" />
+      ) : (
+        <>
+          {/* User Profile Card */}
+          <TouchableOpacity style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleEditProfile} activeOpacity={0.8}>
+            <View style={styles.avatarContainer}>
+              <View style={[styles.avatar, { backgroundColor: colors.foreground }]}>
+                <FontAwesome name="user" size={40} color={colors.background} />
               </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>{item.title}</Text>
-                <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+              <View style={[styles.editButton, { backgroundColor: colors.accent }]}>
+                <FontAwesome name="camera" size={16} color={colors.background} />
               </View>
             </View>
-            <FontAwesome name="chevron-right" size={16} color="#ccc" />
+            <Text style={[styles.userName, { color: colors.foreground }]}>{user?.name || 'Loading...'}</Text>
+            <Text style={[styles.userEmail, { color: colors.muted }]}>{user?.email || 'Loading...'}</Text>
+            <Text style={[styles.joinDate, { color: colors.muted }]}>Member since {user?.joinDate ? new Date(user.joinDate).toLocaleDateString() : 'Loading...'}</Text>
+            <View style={styles.editProfileHint}>
+              <Text style={[styles.editProfileHintText, { color: colors.muted }]}>Tap to edit profile</Text>
+              <FontAwesome name="chevron-right" size={12} color={colors.muted} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Stats Row */}
+          <View style={[styles.statsRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.activitiesCreated || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>Created</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.activitiesJoined || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>Joined</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.connectionsMade || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>Connections</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.streakDays || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>Day Streak</Text>
+            </View>
+          </View>
+        </>
+      )}
+
+      {/* Settings Section */}
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Settings</Text>
+      
+      <View style={[styles.settingsContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+        {settingsItems.map((item) => (
+          <TouchableOpacity key={item.id} style={[styles.settingItem, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={item.onPress}>
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.foreground }]}>
+                <FontAwesome name={item.icon as any} size={20} color={colors.background} />
+              </View>
+              <View style={styles.settingText}>
+                <Text style={[styles.settingTitle, { color: colors.foreground }]}>{item.title}</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.muted }]}>{item.subtitle}</Text>
+              </View>
+            </View>
+            <FontAwesome name="chevron-right" size={16} color={colors.muted} />
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <FontAwesome name="sign-out" size={20} color="#ff4444" />
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+      {/* Logout Button - Only show for authenticated users */}
+      {isAuthenticated && !isGuest && (
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleLogout}>
+          <FontAwesome name="sign-out" size={20} color={colors.error} />
+          <Text style={[styles.logoutText, { color: colors.error }]}>Logout</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Edit Profile Modal */}
       <Modal
@@ -269,16 +334,16 @@ export default function ProfileScreen() {
         onRequestClose={() => setShowEditModal(false)}
       >
         <KeyboardAvoidingView 
-          style={styles.modalContainer} 
+          style={[styles.modalContainer, { backgroundColor: colors.background }]} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={[styles.modalHeader]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+              <Text style={[styles.modalCancelText, { color: colors.muted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Update Profile</Text>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Update Profile</Text>
             <TouchableOpacity onPress={handleSaveProfile} disabled={isLoading}>
-              <Text style={[styles.modalSaveText, isLoading && styles.modalSaveTextDisabled]}>
+              <Text style={[styles.modalSaveText, { color: colors.accent }, isLoading && styles.modalSaveTextDisabled]}>
                 {isLoading ? 'Saving...' : 'Save'}
               </Text>
             </TouchableOpacity>
@@ -287,62 +352,65 @@ export default function ProfileScreen() {
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Basic Info Section */}
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Basic Information</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Basic Information</Text>
               
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Name</Text>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Name</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={editName}
                   onChangeText={setEditName}
                   placeholder="Enter your name"
+                  placeholderTextColor={colors.muted}
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Email</Text>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Email</Text>
                 <TextInput
-                  style={[styles.textInput, styles.textInputDisabled]}
+                  style={[styles.textInput, styles.textInputDisabled, { backgroundColor: colors.background, borderColor: colors.border, color: colors.muted }]}
                   value={editEmail}
                   editable={false}
                   placeholder="Email cannot be changed"
+                  placeholderTextColor={colors.muted}
                 />
-                <Text style={styles.inputNote}>Email cannot be changed</Text>
+                <Text style={[styles.inputNote, { color: colors.muted }]}>Email cannot be changed</Text>
               </View>
             </View>
 
             {/* Location Section */}
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Location</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Location</Text>
               
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Address</Text>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Address</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={editLocation}
                   onChangeText={setEditLocation}
                   placeholder="Enter your location"
+                  placeholderTextColor={colors.muted}
                   autoCapitalize="words"
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Search Radius (km)</Text>
-                <View style={styles.radiusContainer}>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Search Radius (km)</Text>
+                <View style={[styles.radiusContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <TouchableOpacity 
-                    style={styles.radiusButton}
+                    style={[styles.radiusButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                     onPress={() => setEditRadius(Math.max(1, editRadius - 1))}
                   >
-                    <FontAwesome name="minus" size={16} color="#000" />
+                    <FontAwesome name="minus" size={16} color={colors.foreground} />
                   </TouchableOpacity>
-                  <Text style={styles.radiusValue}>{editRadius} km</Text>
+                  <Text style={[styles.radiusValue, { color: colors.foreground }]}>{editRadius} km</Text>
                   <TouchableOpacity 
-                    style={styles.radiusButton}
+                    style={[styles.radiusButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                     onPress={() => setEditRadius(Math.min(50, editRadius + 1))}
                   >
-                    <FontAwesome name="plus" size={16} color="#000" />
+                    <FontAwesome name="plus" size={16} color={colors.foreground} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -350,58 +418,58 @@ export default function ProfileScreen() {
 
             {/* Notifications Section */}
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Notification Preferences</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Notification Preferences</Text>
               
-              <View style={styles.switchContainer}>
+              <View style={[styles.switchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Email Notifications</Text>
+                  <Text style={[styles.switchLabel, { color: colors.foreground }]}>Email Notifications</Text>
                   <Switch
                     value={editPreferences.notifications.email}
                     onValueChange={(value) => setEditPreferences(prev => ({
                       ...prev,
                       notifications: { ...prev.notifications, email: value }
                     }))}
-                    trackColor={{ false: '#e0e0e0', true: '#000' }}
-                    thumbColor={editPreferences.notifications.email ? '#fff' : '#f4f3f4'}
+                    trackColor={{ false: colors.border, true: colors.foreground }}
+                    thumbColor={editPreferences.notifications.email ? colors.background : colors.muted}
                   />
                 </View>
 
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Push Notifications</Text>
+                  <Text style={[styles.switchLabel, { color: colors.foreground }]}>Push Notifications</Text>
                   <Switch
                     value={editPreferences.notifications.push}
                     onValueChange={(value) => setEditPreferences(prev => ({
                       ...prev,
                       notifications: { ...prev.notifications, push: value }
                     }))}
-                    trackColor={{ false: '#e0e0e0', true: '#000' }}
-                    thumbColor={editPreferences.notifications.push ? '#fff' : '#f4f3f4'}
+                    trackColor={{ false: colors.border, true: colors.foreground }}
+                    thumbColor={editPreferences.notifications.push ? colors.background : colors.muted}
                   />
                 </View>
 
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Join Requests</Text>
+                  <Text style={[styles.switchLabel, { color: colors.foreground }]}>Join Requests</Text>
                   <Switch
                     value={editPreferences.notifications.joinRequests}
                     onValueChange={(value) => setEditPreferences(prev => ({
                       ...prev,
                       notifications: { ...prev.notifications, joinRequests: value }
                     }))}
-                    trackColor={{ false: '#e0e0e0', true: '#000' }}
-                    thumbColor={editPreferences.notifications.joinRequests ? '#fff' : '#f4f3f4'}
+                    trackColor={{ false: colors.border, true: colors.foreground }}
+                    thumbColor={editPreferences.notifications.joinRequests ? colors.background : colors.muted}
                   />
                 </View>
 
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Activity Reminders</Text>
+                  <Text style={[styles.switchLabel, { color: colors.foreground }]}>Activity Reminders</Text>
                   <Switch
                     value={editPreferences.notifications.activityReminders}
                     onValueChange={(value) => setEditPreferences(prev => ({
                       ...prev,
                       notifications: { ...prev.notifications, activityReminders: value }
                     }))}
-                    trackColor={{ false: '#e0e0e0', true: '#000' }}
-                    thumbColor={editPreferences.notifications.activityReminders ? '#fff' : '#f4f3f4'}
+                    trackColor={{ false: colors.border, true: colors.foreground }}
+                    thumbColor={editPreferences.notifications.activityReminders ? colors.background : colors.muted}
                   />
                 </View>
               </View>
@@ -409,46 +477,49 @@ export default function ProfileScreen() {
 
             {/* Password Change Section */}
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Change Password (Optional)</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Change Password (Optional)</Text>
               
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Current Password</Text>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Current Password</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   placeholder="Enter your current password"
+                  placeholderTextColor={colors.muted}
                   secureTextEntry
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>New Password</Text>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>New Password</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   placeholder="Enter your new password"
+                  placeholderTextColor={colors.muted}
                   secureTextEntry
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Confirm New Password</Text>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Confirm New Password</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm your new password"
+                  placeholderTextColor={colors.muted}
                   secureTextEntry
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.passwordNote}>
-                <Text style={styles.inputNote}>
+                <Text style={[styles.inputNote, { color: colors.muted }]}>
                   Leave password fields empty to keep your current password
                 </Text>
               </View>
@@ -457,14 +528,27 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-    </ScrollView>
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
+
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   centerContent: {
     justifyContent: "center",
@@ -472,17 +556,28 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
+    paddingTop: 130, // Account for fixed header + safe area + extra spacing
+    paddingBottom: PADDING.content.vertical,
     width: "100%",
     minWidth: "100%",
   },
   header: {
-    marginBottom: PADDING.content.vertical,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+
   },
   title: {
-    fontSize: FONT_SIZES.xxxl,
+    fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
-    color: "#000",
   },
   profileCard: {
     backgroundColor: "#f8f9fa",
@@ -765,5 +860,45 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: '#999',
     marginRight: GAPS.small,
+  },
+  guestCard: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: BORDER_RADIUS.large,
+    padding: PADDING.card.horizontal,
+    alignItems: "center",
+    marginBottom: PADDING.content.vertical,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  guestTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
+    marginTop: GAPS.medium,
+    marginBottom: GAPS.small,
+  },
+  guestSubtitle: {
+    fontSize: FONT_SIZES.md,
+    textAlign: 'center',
+    marginBottom: GAPS.large,
+    paddingHorizontal: PADDING.content.horizontal,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: PADDING.card.horizontal * 2,
+    paddingVertical: PADDING.input.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+    minWidth: 150,
+  },
+  loginButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
+    marginLeft: GAPS.small,
   },
 });
