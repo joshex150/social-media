@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useRouter } from "expo-router";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 import type { Notification } from "@/services/api";
 
 export default function SystemNotificationsScreen() {
@@ -14,6 +16,7 @@ export default function SystemNotificationsScreen() {
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
   const { notifications, loadNotifications, markNotificationAsRead } = useApi();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   // Load notifications from API
   const loadNotificationsData = async () => {
@@ -36,19 +39,19 @@ export default function SystemNotificationsScreen() {
     // Handle notification action based on type
     switch (notification.type) {
       case 'join_request':
-        Alert.alert('Join Request', 'View join request details');
+        showAlert('Join Request', 'View join request details', 'info');
         break;
       case 'activity_reminder':
-        Alert.alert('Activity Reminder', 'View activity details');
+        showAlert('Activity Reminder', 'View activity details', 'info');
         break;
       case 'new_activity':
-        Alert.alert('New Activity', 'View new activity');
+        showAlert('New Activity', 'View new activity', 'info');
         break;
       case 'achievement':
-        Alert.alert('Achievement', 'View achievement details');
+        showAlert('Achievement', 'View achievement details', 'success');
         break;
       default:
-        Alert.alert('Notification', notification.message);
+        showAlert('Notification', notification.message, 'info');
     }
   };
 
@@ -62,17 +65,18 @@ export default function SystemNotificationsScreen() {
   };
 
   const handleClearAll = () => {
-    Alert.alert(
+    showAlert(
       'Clear All Notifications',
       'Are you sure you want to clear all notifications?',
+      'warning',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         { 
           text: 'Clear All', 
           style: 'destructive',
           onPress: () => {
             // Clear all notifications (this would need to be implemented in the API)
-            console.log('Clear all notifications');
+            // console.log('Clear all notifications');
           }
         }
       ]
@@ -205,6 +209,16 @@ export default function SystemNotificationsScreen() {
           </Text>
         </View>
       )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </ScrollView>
   );
 }

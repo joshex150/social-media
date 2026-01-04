@@ -1,14 +1,17 @@
 import React, { useState } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 
 export default function BillingHistoryScreen() {
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const periods = [
     { id: "all", title: "All Time" },
@@ -83,16 +86,16 @@ export default function BillingHistoryScreen() {
     .reduce((sum, item) => sum + item.amount, 0);
 
   const handleDownloadInvoice = (invoiceId: string) => {
-    Alert.alert("Download Invoice", `Download invoice ${invoiceId}?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Download", onPress: () => Alert.alert("Success", "Invoice downloaded successfully") }
+    showAlert("Download Invoice", `Download invoice ${invoiceId}?`, "info", [
+      { text: "Cancel", style: "cancel", onPress: () => {} },
+      { text: "Download", onPress: () => showAlert("Success", "Invoice downloaded successfully", "success") }
     ]);
   };
 
   const handleRetryPayment = (invoiceId: string) => {
-    Alert.alert("Retry Payment", `Retry payment for ${invoiceId}?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Retry", onPress: () => Alert.alert("Success", "Payment retry initiated") }
+    showAlert("Retry Payment", `Retry payment for ${invoiceId}?`, "warning", [
+      { text: "Cancel", style: "cancel", onPress: () => {} },
+      { text: "Retry", onPress: () => showAlert("Success", "Payment retry initiated", "success") }
     ]);
   };
 
@@ -169,7 +172,7 @@ export default function BillingHistoryScreen() {
         <Text style={styles.sectionTitle}>Billing History</Text>
         {filteredHistory.length === 0 ? (
           <View style={styles.emptyState}>
-            <FontAwesome name="receipt" size={48} color="#ccc" />
+            <FontAwesome name="file-text" size={48} color="#ccc" />
             <Text style={styles.emptyTitle}>No billing history</Text>
             <Text style={styles.emptySubtitle}>
               {selectedPeriod === "all" 
@@ -237,6 +240,16 @@ export default function BillingHistoryScreen() {
           <Text style={styles.exportText}>Export as CSV</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </ScrollView>
   );
 }

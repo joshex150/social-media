@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, RefreshControl } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, RefreshControl } from "react-native";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useRouter } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -7,6 +7,8 @@ import ActivityCard from "@/components/ActivityCard";
 import VibeCheck from "@/components/VibeCheck";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 import type { Activity } from "@/services/api";
 
 const RADIUS_OPTIONS = [5, 10, 20];
@@ -32,10 +34,10 @@ export default function ExploreScreen() {
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
   const { activities, loadActivities, refreshData } = useApi();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
-  // Load activities from API
+  // Filter activities when they change
   const loadActivitiesData = async () => {
-    await loadActivities();
     filterActivities(activities, selectedRadius, selectedCategory);
   };
 
@@ -74,15 +76,16 @@ export default function ExploreScreen() {
   };
 
   const handleJoinActivity = (activityId: string) => {
-    Alert.alert(
+    showAlert(
       'Join Activity',
       'Request to join this activity?',
+      'info',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         { 
           text: 'Join', 
           onPress: () => {
-            Alert.alert('Success', 'Join request sent!');
+            showAlert('Success', 'Join request sent!', 'success');
           }
         }
       ]
@@ -95,7 +98,7 @@ export default function ExploreScreen() {
 
   const handleVibeFeedback = async (vibe: string) => {
     setVibeFeedback(vibe);
-    Alert.alert('Thank you!', 'Your feedback has been recorded.');
+    showAlert('Thank you!', 'Your feedback has been recorded.', 'success');
   };
 
   return (
@@ -221,6 +224,16 @@ export default function ExploreScreen() {
           <Text style={styles.createButtonText}>Create Activity</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </ScrollView>
   );
 }

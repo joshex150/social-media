@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import SubscriptionTier from "@/components/SubscriptionTier";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 import type { SubscriptionTier as SubscriptionTierType } from "@/services/api";
 
 export default function SubscriptionSettingsScreen() {
+  const { colors } = useTheme();
   const [tiers, setTiers] = useState<Record<string, SubscriptionTierType>>({});
   const [currentTier, setCurrentTier] = useState('free');
   const [usage, setUsage] = useState({ 
@@ -24,6 +28,7 @@ export default function SubscriptionSettingsScreen() {
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   useEffect(() => {
     loadSubscriptionData();
@@ -63,17 +68,18 @@ export default function SubscriptionSettingsScreen() {
   };
 
   const handleUpgrade = (tierId: string) => {
-    Alert.alert(
+    showAlert(
       'Upgrade Subscription',
       `Upgrade to ${tiers[tierId]?.name} plan for $${tiers[tierId]?.price}/month?`,
+      'info',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         { 
           text: 'Upgrade', 
           onPress: () => {
             setCurrentTier(tierId as "free" | "silver" | "gold" | "platinum");
             setShowUpgradePrompt(false);
-            Alert.alert('Success', 'Subscription upgraded successfully!');
+            showAlert('Success', 'Subscription upgraded successfully!', 'success');
           }
         }
       ]
@@ -81,17 +87,18 @@ export default function SubscriptionSettingsScreen() {
   };
 
   const handleCancelSubscription = () => {
-    Alert.alert(
+    showAlert(
       'Cancel Subscription',
       'Are you sure you want to cancel your subscription? You will lose access to premium features.',
+      'warning',
       [
-        { text: 'Keep Subscription', style: 'cancel' },
+        { text: 'Keep Subscription', style: 'cancel', onPress: () => {} },
         { 
           text: 'Cancel Subscription', 
           style: 'destructive',
           onPress: () => {
             setCurrentTier('free');
-            Alert.alert('Subscription Cancelled', 'Your subscription has been cancelled.');
+            showAlert('Subscription Cancelled', 'Your subscription has been cancelled.', 'info');
           }
         }
       ]
@@ -124,45 +131,48 @@ export default function SubscriptionSettingsScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={20} color="#000" />
-          <Text style={styles.backButtonText}>Back</Text>
+          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
+          <Text style={[styles.backButtonText, { color: colors.foreground }]}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Subscription</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Subscription</Text>
         <View style={styles.placeholder} />
       </View>
 
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+
       {/* Current Plan */}
-      <View style={styles.currentPlanCard}>
-        <Text style={styles.currentPlanTitle}>Current Plan</Text>
+      <View style={[styles.currentPlanCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.currentPlanTitle, { color: colors.foreground }]}>Current Plan</Text>
         <View style={styles.currentPlanInfo}>
-          <Text style={styles.currentPlanName}>{getTierDisplayName(currentTier)}</Text>
-          <Text style={styles.currentPlanPrice}>{getTierPrice(currentTier)}</Text>
+          <Text style={[styles.currentPlanName, { color: colors.foreground }]}>{getTierDisplayName(currentTier)}</Text>
+          <Text style={[styles.currentPlanPrice, { color: colors.muted }]}>{getTierPrice(currentTier)}</Text>
         </View>
         {currentTier !== 'free' && (
           <TouchableOpacity 
-            style={styles.cancelButton}
+            style={[styles.cancelButton, { backgroundColor: colors.background, borderColor: colors.error }]}
             onPress={handleCancelSubscription}
           >
-            <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+            <Text style={[styles.cancelButtonText, { color: colors.error }]}>Cancel Subscription</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Usage Stats */}
-      <View style={styles.usageCard}>
-        <Text style={styles.usageTitle}>Usage This Month</Text>
+      <View style={[styles.usageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.usageTitle, { color: colors.foreground }]}>Usage This Month</Text>
         <View style={styles.usageStats}>
           <View style={styles.usageItem}>
-            <Text style={styles.usageNumber}>{usage.activities}</Text>
-            <Text style={styles.usageLabel}>Activities Created</Text>
+            <Text style={[styles.usageNumber, { color: colors.foreground }]}>{usage.activities}</Text>
+            <Text style={[styles.usageLabel, { color: colors.muted }]}>Activities Created</Text>
           </View>
           <View style={styles.usageItem}>
-            <Text style={styles.usageNumber}>{usage.daysUsed}</Text>
-            <Text style={styles.usageLabel}>Days Active</Text>
+            <Text style={[styles.usageNumber, { color: colors.foreground }]}>{usage.daysUsed}</Text>
+            <Text style={[styles.usageLabel, { color: colors.muted }]}>Days Active</Text>
           </View>
         </View>
         
@@ -237,24 +247,46 @@ export default function SubscriptionSettingsScreen() {
           daysUsed={usage.daysUsed}
         />
       )}
-    </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
+    paddingTop: 124, // Account for fixed header + safe area + extra spacing
+    paddingBottom: PADDING.content.vertical,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: PADDING.content.vertical,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+    marginTop: PADDING.content.vertical,
   },
   backButton: {
     flexDirection: "row",

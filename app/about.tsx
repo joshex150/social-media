@@ -1,19 +1,24 @@
 import React from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Linking, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Linking } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 
 export default function AboutScreen() {
+  const { colors } = useTheme();
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const handleOpenLink = async (url: string) => {
     try {
       await Linking.openURL(url);
     } catch (error) {
-      Alert.alert("Error", "Could not open link");
+      showAlert("Error", "Could not open link", "error");
     }
   };
 
@@ -97,140 +102,165 @@ export default function AboutScreen() {
   ];
 
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={20} color="#000" />
+          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={styles.title}>About</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>About</Text>
         <View style={styles.placeholder} />
       </View>
 
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+
       {/* App Info Card */}
-      <View style={styles.appCard}>
-        <View style={styles.appIcon}>
-          <FontAwesome name="link" size={40} color="#fff" />
+      <View style={[styles.appCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.appIcon, { backgroundColor: colors.foreground }]}>
+          <FontAwesome name="link" size={40} color={colors.background} />
         </View>
-        <Text style={styles.appName}>{appInfo.name}</Text>
-        <Text style={styles.appVersion}>Version {appInfo.version}</Text>
-        <Text style={styles.appDescription}>{appInfo.description}</Text>
+        <Text style={[styles.appName, { color: colors.foreground }]}>{appInfo.name}</Text>
+        <Text style={[styles.appVersion, { color: colors.muted }]}>Version {appInfo.version}</Text>
+        <Text style={[styles.appDescription, { color: colors.muted }]}>{appInfo.description}</Text>
       </View>
 
       {/* Features */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Features</Text>
+      <View style={[styles.section, {  borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Features</Text>
         {appInfo.features.map((feature, index) => (
-          <View key={index} style={styles.featureItem}>
-            <FontAwesome name="check-circle" size={16} color="#10b981" />
-            <Text style={styles.featureText}>{feature}</Text>
+          <View key={index} style={[styles.featureItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <FontAwesome name="check-circle" size={16} color={colors.accent} />
+            <Text style={[styles.featureText, { color: colors.foreground }]}>{feature}</Text>
           </View>
         ))}
       </View>
 
       {/* Team */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Our Team</Text>
+      <View style={[styles.section, {  borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Our Team</Text>
         {teamMembers.map((member, index) => (
-          <View key={index} style={styles.teamMember}>
-            <View style={styles.memberAvatar}>
-              <FontAwesome name="user" size={20} color="#000" />
+          <View key={index} style={[styles.teamMember, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={[styles.memberAvatar, { backgroundColor: colors.foreground }]}>
+              <FontAwesome name="user" size={20} color={colors.background} />
             </View>
             <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>{member.name}</Text>
-              <Text style={styles.memberRole}>{member.role}</Text>
+              <Text style={[styles.memberName, { color: colors.foreground }]}>{member.name}</Text>
+              <Text style={[styles.memberRole, { color: colors.muted }]}>{member.role}</Text>
             </View>
             <TouchableOpacity 
-              style={styles.contactButton}
+              style={[styles.contactButton, { backgroundColor: colors.foreground }]}
               onPress={() => handleOpenLink(`mailto:${member.email}`)}
             >
-              <FontAwesome name="envelope" size={16} color="#000" />
+              <FontAwesome name="envelope" size={16} color={colors.background} />
             </TouchableOpacity>
           </View>
         ))}
       </View>
 
       {/* Legal Links */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Legal</Text>
+      <View style={[styles.section, {  borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Legal</Text>
         {legalLinks.map((link, index) => (
           <TouchableOpacity 
             key={index} 
-            style={styles.linkItem}
+            style={[styles.linkItem, { backgroundColor: colors.background, borderColor: colors.border }]}
             onPress={() => handleOpenLink(link.url)}
           >
             <View style={styles.linkLeft}>
-              <FontAwesome name={link.icon as any} size={20} color="#000" />
-              <Text style={styles.linkText}>{link.title}</Text>
+              <FontAwesome name={link.icon as any} size={20} color={colors.foreground} />
+              <Text style={[styles.linkText, { color: colors.foreground }]}>{link.title}</Text>
             </View>
-            <FontAwesome name="external-link" size={14} color="#ccc" />
+            <FontAwesome name="external-link" size={14} color={colors.muted} />
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Social Links */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Connect With Us</Text>
+      <View style={[styles.section, {  borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Connect With Us</Text>
         <View style={styles.socialGrid}>
           {socialLinks.map((link, index) => (
             <TouchableOpacity 
               key={index} 
-              style={styles.socialItem}
+              style={[styles.socialItem, { backgroundColor: colors.background, borderColor: colors.border }]}
               onPress={() => handleOpenLink(link.url)}
             >
-              <FontAwesome name={link.icon as any} size={24} color="#000" />
-              <Text style={styles.socialText}>{link.title}</Text>
+              <FontAwesome name={link.icon as any} size={24} color={colors.foreground} />
+              <Text style={[styles.socialText, { color: colors.foreground }]}>{link.title}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
       {/* App Stats */}
-      <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>App Statistics</Text>
+      <View style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.statsTitle, { color: colors.foreground }]}>App Statistics</Text>
         <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>10K+</Text>
-            <Text style={styles.statLabel}>Users</Text>
+          <View style={[styles.statItem, {  borderColor: colors.border }]}>
+            <Text style={[styles.statNumber, { color: colors.foreground }]}>10K+</Text>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Users</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>50K+</Text>
-            <Text style={styles.statLabel}>Activities</Text>
+          <View style={[styles.statItem, {  borderColor: colors.border }]}>
+            <Text style={[styles.statNumber, { color: colors.foreground }]}>50K+</Text>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Activities</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>100K+</Text>
-            <Text style={styles.statLabel}>Connections</Text>
+          <View style={[styles.statItem, {  borderColor: colors.border }]}>
+            <Text style={[styles.statNumber, { color: colors.foreground }]}>100K+</Text>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Connections</Text>
           </View>
         </View>
       </View>
 
       {/* Copyright */}
-      <View style={styles.copyright}>
-        <Text style={styles.copyrightText}>
+      <View style={[styles.copyright, {  borderColor: colors.border }]}>
+        <Text style={[styles.copyrightText, { color: colors.muted }]}>
           © 2025 Link Up Inc. All rights reserved.
         </Text>
-        <Text style={styles.copyrightSubtext}>
+        <Text style={[styles.copyrightSubtext, { color: colors.muted }]}>
           Made with ❤️ for connecting people
         </Text>
       </View>
-    </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
+    paddingTop: 124, // Account for fixed header + safe area + extra spacing
+    paddingBottom: PADDING.content.vertical,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: PADDING.content.vertical,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+    marginTop: PADDING.content.vertical,
   },
   backButton: {
     padding: GAPS.small,
@@ -292,6 +322,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     marginBottom: GAPS.small,
+    borderBottomWidth: 1,
   },
   featureText: {
     fontSize: FONT_SIZES.md,
@@ -306,6 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     marginBottom: GAPS.small,
+    borderBottomWidth: 1,
   },
   memberAvatar: {
     width: 40,
@@ -345,6 +377,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     marginBottom: GAPS.small,
+    borderBottomWidth: 1,
   },
   linkLeft: {
     flexDirection: "row",

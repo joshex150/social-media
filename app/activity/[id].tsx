@@ -5,7 +5,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   Dimensions,
 } from 'react-native';
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -15,6 +14,8 @@ import MapView from '@/components/MapView';
 import ChatBox from '@/components/ChatBox';
 import FeedbackModal from '@/components/FeedbackModal';
 import { useApi } from '@/contexts/ApiContext';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import CustomAlert from '@/components/CustomAlert';
 import type { Activity, Chat } from '@/services/api';
 
 const { width } = Dimensions.get('window');
@@ -28,13 +29,15 @@ export default function ActivityDetailsScreen() {
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { user } = useApi();
   const { activities, chats, loadActivities, loadChats } = useApi();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   // Load activity and chat data
   const loadActivityData = async () => {
     if (!id) return;
     
-    await Promise.all([loadActivities(), loadChats()]);
+    // Activities and chats are loaded centrally by ApiContext
     
     const activityData = activities.find(a => a._id === id);
     if (activityData) {
@@ -54,15 +57,16 @@ export default function ActivityDetailsScreen() {
   }, [id]);
 
   const handleJoinActivity = () => {
-    Alert.alert(
+    showAlert(
       'Join Activity',
       'Request to join this activity?',
+      'info',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         { 
           text: 'Join', 
           onPress: () => {
-            Alert.alert('Success', 'Join request sent!');
+            showAlert('Success', 'Join request sent!', 'success');
           }
         }
       ]
@@ -99,7 +103,7 @@ export default function ActivityDetailsScreen() {
   };
 
   const handleFeedback = async (feedback: any) => {
-    Alert.alert('Thank you!', 'Your feedback has been recorded.');
+    showAlert('Thank you!', 'Your feedback has been recorded.', 'success');
     setShowFeedback(false);
   };
 
@@ -287,9 +291,14 @@ export default function ActivityDetailsScreen() {
       {activeTab === 'chat' && chat && (
         <View style={styles.tabContent}>
           <ChatBox
-            messages={chat.messages}
+            messages={chat.messages || []}
             onSendMessage={handleSendMessage}
             onTyping={() => {}}
+            onLoadMore={() => {}}
+            hasMore={false}
+            isLoadingMore={false}
+            typingUsers={[]}
+            currentUserId={user?.id}
           />
         </View>
       )}
@@ -300,6 +309,16 @@ export default function ActivityDetailsScreen() {
         event={activity}
         onClose={() => setShowFeedback(false)}
         onSubmit={handleFeedback}
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
       />
     </View>
   );

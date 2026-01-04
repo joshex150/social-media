@@ -1,15 +1,20 @@
 import React, { useState } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, TextInput, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, TextInput } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 
 export default function HelpSupportScreen() {
+  const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const categories = [
     { id: "all", title: "All Topics", icon: "list" },
@@ -77,21 +82,21 @@ export default function HelpSupportScreen() {
       title: "Email Support",
       subtitle: "Get help via email within 24 hours",
       icon: "envelope",
-      action: () => Alert.alert("Email Support", "Send us an email at support@linkup.app")
+      action: () => showAlert("Email Support", "Send us an email at support@linkup.app", "info")
     },
     {
       id: "chat",
       title: "Live Chat",
       subtitle: "Chat with our support team",
       icon: "comment",
-      action: () => Alert.alert("Live Chat", "Live chat is available 9 AM - 6 PM EST")
+      action: () => showAlert("Live Chat", "Live chat is available 9 AM - 6 PM EST", "info")
     },
     {
       id: "phone",
       title: "Phone Support",
       subtitle: "Call us for immediate assistance",
       icon: "phone",
-      action: () => Alert.alert("Phone Support", "Call us at +1 (555) 123-4567")
+      action: () => showAlert("Phone Support", "Call us at +1 (555) 123-4567", "info")
     }
   ];
 
@@ -104,23 +109,26 @@ export default function HelpSupportScreen() {
   });
 
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={20} color="#000" />
+          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={styles.title}>Help & Support</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Help & Support</Text>
         <View style={styles.placeholder} />
       </View>
 
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <FontAwesome name="search" size={16} color="#999" style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <FontAwesome name="search" size={16} color={colors.muted} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
           placeholder="Search help topics..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -133,17 +141,19 @@ export default function HelpSupportScreen() {
             key={category.id}
             style={[
               styles.categoryButton,
-              selectedCategory === category.id && styles.categoryButtonActive
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              selectedCategory === category.id && [styles.categoryButtonActive, { backgroundColor: colors.foreground }]
             ]}
             onPress={() => setSelectedCategory(category.id)}
           >
             <FontAwesome 
               name={category.icon as any} 
               size={16} 
-              color={selectedCategory === category.id ? "#fff" : "#666"} 
+              color={selectedCategory === category.id ? colors.background : colors.muted} 
             />
             <Text style={[
               styles.categoryText,
+              { color: selectedCategory === category.id ? colors.background : colors.foreground },
               selectedCategory === category.id && styles.categoryTextActive
             ]}>
               {category.title}
@@ -153,81 +163,103 @@ export default function HelpSupportScreen() {
       </ScrollView>
 
       {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={[styles.quickActions, { borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
         <View style={styles.actionGrid}>
-          <TouchableOpacity style={styles.actionItem}>
-            <FontAwesome name="book" size={24} color="#000" />
-            <Text style={styles.actionText}>User Guide</Text>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <FontAwesome name="book" size={24} color={colors.foreground} />
+            <Text style={[styles.actionText, { color: colors.foreground }]}>User Guide</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem}>
-            <FontAwesome name="video-camera" size={24} color="#000" />
-            <Text style={styles.actionText}>Tutorials</Text>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <FontAwesome name="video-camera" size={24} color={colors.foreground} />
+            <Text style={[styles.actionText, { color: colors.foreground }]}>Tutorials</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem}>
-            <FontAwesome name="bug" size={24} color="#000" />
-            <Text style={styles.actionText}>Report Bug</Text>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <FontAwesome name="bug" size={24} color={colors.foreground} />
+            <Text style={[styles.actionText, { color: colors.foreground }]}>Report Bug</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem}>
-            <FontAwesome name="lightbulb-o" size={24} color="#000" />
-            <Text style={styles.actionText}>Suggestions</Text>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <FontAwesome name="lightbulb-o" size={24} color={colors.foreground} />
+            <Text style={[styles.actionText, { color: colors.foreground }]}>Suggestions</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* FAQ Section */}
-      <View style={styles.faqSection}>
-        <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+      <View style={[styles.faqSection, { borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Frequently Asked Questions</Text>
         {filteredFaqs.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>{item.question}</Text>
-            <Text style={styles.faqAnswer}>{item.answer}</Text>
+          <TouchableOpacity key={item.id} style={[styles.faqItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Text style={[styles.faqQuestion, { color: colors.foreground }]}>{item.question}</Text>
+            <Text style={[styles.faqAnswer, { color: colors.muted }]}>{item.answer}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Contact Support */}
-      <View style={styles.contactSection}>
-        <Text style={styles.sectionTitle}>Contact Support</Text>
+      <View style={[styles.contactSection, {  borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Contact Support</Text>
         {contactMethods.map((method) => (
-          <TouchableOpacity key={method.id} style={styles.contactItem} onPress={method.action}>
+          <TouchableOpacity key={method.id} style={[styles.contactItem, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={method.action}>
             <View style={styles.contactLeft}>
-              <View style={styles.contactIcon}>
-                <FontAwesome name={method.icon as any} size={20} color="#000" />
+              <View style={[styles.contactIcon, { backgroundColor: colors.foreground }]}>
+                <FontAwesome name={method.icon as any} size={20} color={colors.background} />
               </View>
               <View style={styles.contactText}>
-                <Text style={styles.contactTitle}>{method.title}</Text>
-                <Text style={styles.contactSubtitle}>{method.subtitle}</Text>
+                <Text style={[styles.contactTitle, { color: colors.foreground }]}>{method.title}</Text>
+                <Text style={[styles.contactSubtitle, { color: colors.muted }]}>{method.subtitle}</Text>
               </View>
             </View>
-            <FontAwesome name="chevron-right" size={16} color="#ccc" />
+            <FontAwesome name="chevron-right" size={16} color={colors.muted} />
           </TouchableOpacity>
         ))}
       </View>
 
       {/* App Version */}
-      <View style={styles.versionInfo}>
-        <Text style={styles.versionText}>Link Up v1.0.0</Text>
-        <Text style={styles.versionSubtext}>Last updated: January 2025</Text>
+      <View style={[styles.versionInfo, { borderColor: colors.border }]}>
+        <Text style={[styles.versionText, { color: colors.muted }]}>Link Up v1.0.0</Text>
+        <Text style={[styles.versionSubtext, { color: colors.muted }]}>Last updated: January 2025</Text>
       </View>
-    </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
+    paddingTop: 124, // Account for fixed header + safe area + extra spacing
+    paddingBottom: PADDING.content.vertical,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: PADDING.content.vertical,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+    marginTop: PADDING.content.vertical,
   },
   backButton: {
     padding: GAPS.small,
@@ -243,10 +275,11 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.medium,
     paddingHorizontal: PADDING.input.horizontal,
     marginBottom: PADDING.content.vertical,
+    borderWidth: 1,
+    height: 48,
   },
   searchIcon: {
     marginRight: GAPS.small,
@@ -255,7 +288,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: PADDING.input.vertical,
     fontSize: FONT_SIZES.md,
-    color: "#000",
   },
   categoriesContainer: {
     marginBottom: PADDING.content.vertical,
@@ -263,23 +295,22 @@ const styles = StyleSheet.create({
   categoryButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
     borderRadius: BORDER_RADIUS.full,
     paddingHorizontal: PADDING.button.horizontal,
     paddingVertical: PADDING.buttonSmall.vertical,
     marginRight: GAPS.small,
+    borderWidth: 1,
   },
   categoryButtonActive: {
-    backgroundColor: "#000",
+    // Active state styling handled by theme colors in JSX
   },
   categoryText: {
     fontSize: FONT_SIZES.sm,
-    color: "#666",
     marginLeft: GAPS.small,
     fontWeight: FONT_WEIGHTS.medium,
   },
   categoryTextActive: {
-    color: "#fff",
+    // Active text color handled by theme colors in JSX
   },
   quickActions: {
     marginBottom: PADDING.content.vertical,
@@ -317,6 +348,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     marginBottom: GAPS.small,
+    borderBottomWidth: 1,
   },
   faqQuestion: {
     fontSize: FONT_SIZES.md,
@@ -340,6 +372,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.medium,
     padding: PADDING.card.horizontal,
     marginBottom: GAPS.small,
+    borderBottomWidth: 1,
   },
   contactLeft: {
     flexDirection: "row",

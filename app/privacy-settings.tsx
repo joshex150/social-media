@@ -1,11 +1,15 @@
 import React, { useState } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Switch, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Switch } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 
 export default function PrivacySettingsScreen() {
+  const { colors } = useTheme();
   const [privacy, setPrivacy] = useState({
     profileVisibility: "public",
     showLocation: true,
@@ -17,6 +21,7 @@ export default function PrivacySettingsScreen() {
   });
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const handleToggle = (key: string) => {
     setPrivacy(prev => ({
@@ -26,14 +31,15 @@ export default function PrivacySettingsScreen() {
   };
 
   const handleProfileVisibility = () => {
-    Alert.alert(
+    showAlert(
       "Profile Visibility",
       "Choose who can see your profile",
+      "info",
       [
         { text: "Public", onPress: () => setPrivacy(prev => ({ ...prev, profileVisibility: "public" })) },
         { text: "Friends Only", onPress: () => setPrivacy(prev => ({ ...prev, profileVisibility: "friends" })) },
         { text: "Private", onPress: () => setPrivacy(prev => ({ ...prev, profileVisibility: "private" })) },
-        { text: "Cancel", style: "cancel" }
+        { text: "Cancel", style: "cancel", onPress: () => {} }
       ]
     );
   };
@@ -111,38 +117,42 @@ export default function PrivacySettingsScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
+      <View style={[styles.header, safeArea.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={20} color="#000" />
+          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={styles.title}>Privacy & Security</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Privacy & Security</Text>
         <View style={styles.placeholder} />
       </View>
 
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+
       {/* Description */}
-      <Text style={styles.description}>
+      <Text style={[styles.description, { color: colors.muted }]}>
         Control your privacy settings and manage how your information is shared.
       </Text>
 
       {/* Privacy Groups */}
       {privacyGroups.map((group, groupIndex) => (
-        <View key={groupIndex} style={styles.group}>
-          <Text style={styles.groupTitle}>{group.title}</Text>
+        <View key={groupIndex} style={[styles.group, {  borderColor: colors.border }]}>
+          <Text style={[styles.groupTitle, { color: colors.foreground }]}>{group.title}</Text>
           
           {group.items.map((item, itemIndex) => (
             <View key={item.key} style={[
               styles.privacyItem,
+              { backgroundColor: colors.background, borderColor: colors.border },
               itemIndex === group.items.length - 1 && styles.lastItem
             ]}>
               <View style={styles.privacyLeft}>
-                <View style={styles.privacyIcon}>
-                  <FontAwesome name={item.icon as any} size={20} color="#000" />
+                <View style={[styles.privacyIcon, { backgroundColor: colors.foreground }]}>
+                  <FontAwesome name={item.icon as any} size={20} color={colors.background} />
                 </View>
                 <View style={styles.privacyText}>
-                  <Text style={styles.privacyTitle}>{item.title}</Text>
-                  <Text style={styles.privacySubtitle}>{item.subtitle}</Text>
+                  <Text style={[styles.privacyTitle, { color: colors.foreground }]}>{item.title}</Text>
+                  <Text style={[styles.privacySubtitle, { color: colors.muted }]}>{item.subtitle}</Text>
                 </View>
               </View>
               <View style={styles.privacyRight}>
@@ -150,13 +160,13 @@ export default function PrivacySettingsScreen() {
                   <Switch
                     value={privacy[item.key as keyof typeof privacy] as boolean}
                     onValueChange={() => handleToggle(item.key)}
-                    trackColor={{ false: "#e9ecef", true: "#000" }}
-                    thumbColor={privacy[item.key as keyof typeof privacy] ? "#fff" : "#fff"}
+                    trackColor={{ false: colors.border, true: colors.foreground }}
+                    thumbColor={privacy[item.key as keyof typeof privacy] ? colors.background : colors.muted}
                   />
                 ) : (
-                  <TouchableOpacity onPress={handleProfileVisibility} style={styles.selectButton}>
-                    <Text style={styles.selectText}>{getVisibilityText(item.value as string)}</Text>
-                    <FontAwesome name="chevron-right" size={14} color="#ccc" />
+                  <TouchableOpacity onPress={handleProfileVisibility} style={[styles.selectButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <Text style={[styles.selectText, { color: colors.foreground }]}>{getVisibilityText(item.value as string)}</Text>
+                    <FontAwesome name="chevron-right" size={14} color={colors.muted} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -166,89 +176,111 @@ export default function PrivacySettingsScreen() {
       ))}
 
       {/* Security Section */}
-      <View style={styles.group}>
-        <Text style={styles.groupTitle}>Security</Text>
+      <View style={[styles.group, {  borderColor: colors.border }]}>
+        <Text style={[styles.groupTitle, { color: colors.foreground }]}>Security</Text>
         
-        <TouchableOpacity style={styles.securityItem}>
+        <TouchableOpacity style={[styles.securityItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.securityLeft}>
-            <View style={styles.privacyIcon}>
-              <FontAwesome name="lock" size={20} color="#000" />
+            <View style={[styles.privacyIcon, { backgroundColor: colors.foreground }]}>
+              <FontAwesome name="lock" size={20} color={colors.background} />
             </View>
             <View style={styles.privacyText}>
-              <Text style={styles.privacyTitle}>Change Password</Text>
-              <Text style={styles.privacySubtitle}>Update your account password</Text>
+              <Text style={[styles.privacyTitle, { color: colors.foreground }]}>Change Password</Text>
+              <Text style={[styles.privacySubtitle, { color: colors.muted }]}>Update your account password</Text>
             </View>
           </View>
-          <FontAwesome name="chevron-right" size={16} color="#ccc" />
+          <FontAwesome name="chevron-right" size={16} color={colors.muted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.securityItem, styles.lastItem]}>
+        <TouchableOpacity style={[styles.securityItem, styles.lastItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.securityLeft}>
-            <View style={styles.privacyIcon}>
-              <FontAwesome name="mobile" size={20} color="#000" />
+            <View style={[styles.privacyIcon, { backgroundColor: colors.foreground }]}>
+              <FontAwesome name="mobile" size={20} color={colors.background} />
             </View>
             <View style={styles.privacyText}>
-              <Text style={styles.privacyTitle}>Two-Factor Authentication</Text>
-              <Text style={styles.privacySubtitle}>Add an extra layer of security</Text>
+              <Text style={[styles.privacyTitle, { color: colors.foreground }]}>Two-Factor Authentication</Text>
+              <Text style={[styles.privacySubtitle, { color: colors.muted }]}>Add an extra layer of security</Text>
             </View>
           </View>
-          <FontAwesome name="chevron-right" size={16} color="#ccc" />
+          <FontAwesome name="chevron-right" size={16} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
       {/* Data Management */}
-      <View style={styles.group}>
-        <Text style={styles.groupTitle}>Data Management</Text>
+      <View style={[styles.group, {  borderColor: colors.border }]}>
+        <Text style={[styles.groupTitle, { color: colors.foreground }]}>Data Management</Text>
         
-        <TouchableOpacity style={styles.dataItem}>
+        <TouchableOpacity style={[styles.dataItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.dataLeft}>
-            <View style={styles.privacyIcon}>
-              <FontAwesome name="download" size={20} color="#000" />
+            <View style={[styles.privacyIcon, { backgroundColor: colors.foreground }]}>
+              <FontAwesome name="download" size={20} color={colors.background} />
             </View>
             <View style={styles.privacyText}>
-              <Text style={styles.privacyTitle}>Download My Data</Text>
-              <Text style={styles.privacySubtitle}>Get a copy of your data</Text>
+              <Text style={[styles.privacyTitle, { color: colors.foreground }]}>Download My Data</Text>
+              <Text style={[styles.privacySubtitle, { color: colors.muted }]}>Get a copy of your data</Text>
             </View>
           </View>
-          <FontAwesome name="chevron-right" size={16} color="#ccc" />
+          <FontAwesome name="chevron-right" size={16} color={colors.muted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.dataItem, styles.lastItem]}>
+        <TouchableOpacity style={[styles.dataItem, styles.lastItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.dataLeft}>
-            <View style={styles.privacyIcon}>
-              <FontAwesome name="trash" size={20} color="#ff4444" />
+            <View style={[styles.privacyIcon, { backgroundColor: colors.error }]}>
+              <FontAwesome name="trash" size={20} color={colors.background} />
             </View>
             <View style={styles.privacyText}>
-              <Text style={[styles.privacyTitle, { color: "#ff4444" }]}>Delete Account</Text>
-              <Text style={styles.privacySubtitle}>Permanently delete your account</Text>
+              <Text style={[styles.privacyTitle, { color: colors.error }]}>Delete Account</Text>
+              <Text style={[styles.privacySubtitle, { color: colors.muted }]}>Permanently delete your account</Text>
             </View>
           </View>
-          <FontAwesome name="chevron-right" size={16} color="#ccc" />
+          <FontAwesome name="chevron-right" size={16} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
       {/* Save Button */}
-      <TouchableOpacity style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Save Changes</Text>
+      <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.foreground }]}>
+        <Text style={[styles.saveButtonText, { color: colors.background }]}>Save Changes</Text>
       </TouchableOpacity>
-    </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     paddingHorizontal: PADDING.content.horizontal,
-    paddingVertical: PADDING.content.vertical,
+    paddingTop: 124, // Account for fixed header + safe area + extra spacing
+    paddingBottom: PADDING.content.vertical,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: PADDING.content.vertical,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.content.vertical,
+    borderBottomWidth: 1,
+    marginTop: PADDING.content.vertical,
   },
   backButton: {
     padding: GAPS.small,
@@ -283,7 +315,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     padding: PADDING.card.horizontal,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   lastItem: {
     borderBottomWidth: 0,
@@ -336,7 +367,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     padding: PADDING.card.horizontal,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   securityLeft: {
     flexDirection: "row",
@@ -350,7 +380,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     padding: PADDING.card.horizontal,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   dataLeft: {
     flexDirection: "row",

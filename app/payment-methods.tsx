@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
 
 export default function PaymentMethodsScreen() {
   const [paymentMethods, setPaymentMethods] = useState([
@@ -34,16 +36,18 @@ export default function PaymentMethodsScreen() {
   ]);
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const handleAddPayment = () => {
-    Alert.alert(
+    showAlert(
       "Add Payment Method",
       "Choose a payment method to add",
+      "info",
       [
-        { text: "Credit Card", onPress: () => Alert.alert("Coming Soon", "Credit card addition will be available soon") },
-        { text: "PayPal", onPress: () => Alert.alert("Coming Soon", "PayPal integration will be available soon") },
-        { text: "Apple Pay", onPress: () => Alert.alert("Coming Soon", "Apple Pay will be available soon") },
-        { text: "Cancel", style: "cancel" }
+        { text: "Credit Card", onPress: () => showAlert("Coming Soon", "Credit card addition will be available soon", "info") },
+        { text: "PayPal", onPress: () => showAlert("Coming Soon", "PayPal integration will be available soon", "info") },
+        { text: "Apple Pay", onPress: () => showAlert("Coming Soon", "Apple Pay will be available soon", "info") },
+        { text: "Cancel", style: "cancel", onPress: () => {} }
       ]
     );
   };
@@ -58,11 +62,12 @@ export default function PaymentMethodsScreen() {
   };
 
   const handleRemovePayment = (id: string) => {
-    Alert.alert(
+    showAlert(
       "Remove Payment Method",
       "Are you sure you want to remove this payment method?",
+      "warning",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         { 
           text: "Remove", 
           style: "destructive",
@@ -117,7 +122,7 @@ export default function PaymentMethodsScreen() {
             <View style={styles.methodLeft}>
               <View style={styles.methodIcon}>
                 <FontAwesome 
-                  name={method.type === "card" ? getCardIcon(method.brand) : getPaymentIcon(method.type) as any} 
+                  name={method.type === "card" ? getCardIcon(method.brand || "") : getPaymentIcon(method.type) as any} 
                   size={24} 
                   color="#000" 
                 />
@@ -200,6 +205,16 @@ export default function PaymentMethodsScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        buttons={alert.buttons}
+        onClose={hideAlert}
+      />
     </ScrollView>
   );
 }
