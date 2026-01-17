@@ -23,11 +23,17 @@ import { useApi } from "@/contexts/ApiContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import CustomAlert from "@/components/CustomAlert";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { useNavigationGuard } from "@/hooks/useNavigationGuard";
+import { usePreventDoublePress } from "@/hooks/usePreventDoublePress";
 
 export default function CreateActivityScreen() {
   const { colors } = useTheme();
   const errorHandler = useErrorHandler();
-  const { isGuest, isAuthenticated, isLoading: authLoading } = useApi();
+  const { isAuthenticated } = useApi();
+  const { safeBack, safeReplace } = useNavigationGuard();
+  const handleClose = usePreventDoublePress(() => {
+    safeReplace("/(tabs)");
+  });
   const [formData, setFormData] = useState({
     title: "",
     category: "social",
@@ -65,27 +71,11 @@ export default function CreateActivityScreen() {
   });
 
   const safeArea = useSafeAreaStyle();
-  const router = useRouter();
   const { createActivity } = useApi();
 
-  // Redirect guests to login (only after auth state is loaded)
-  React.useEffect(() => {
-    // Don't redirect while authentication is still loading
-    if (authLoading) {
-      return;
-    }
-
-    // Only redirect if user is actually a guest (not authenticated)
-    if (!isAuthenticated && !isGuest) {
-      // Still loading, wait
-      return;
-    }
-
-    // If user is a guest or not authenticated, redirect to login
-    if (isGuest || !isAuthenticated) {
-      router.replace("/login?from=create-activity");
-    }
-  }, [isGuest, isAuthenticated, authLoading, router]);
+  // Note: Guest redirect is handled by tab layout (_layout.tsx)
+  // This screen should only be accessible to authenticated users
+  // If a guest somehow reaches here, they'll be redirected by the tab layout
 
   const categories = [
     { id: "social", name: "Social", icon: "users" },
@@ -279,7 +269,7 @@ export default function CreateActivityScreen() {
               onPress: () => {
                 setLoading(false);
                 isSubmittingRef.current = false;
-                router.replace("/(tabs)");
+                safeBack();
               },
             },
           ]
@@ -328,12 +318,10 @@ export default function CreateActivityScreen() {
         ]}
       >
         <TouchableOpacity
-          onPress={() => {
-            router.replace("/(tabs)");
-          }}
+          onPress={handleClose}
           style={styles.backButton}
         >
-          <FontAwesome name="arrow-left" size={20} color={colors.foreground} />
+          <FontAwesome name="times" size={20} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.foreground }]}>
           Create Activity

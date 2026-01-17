@@ -95,7 +95,7 @@ export default function MapScreen() {
     lng: number;
   } | null>(null);
   const [nearbyActivities, setNearbyActivities] = useState<Activity[]>([]);
-  const { activities, loadActivities } = useApi();
+  const { activities, loadActivities, isAuthenticated, isGuest } = useApi();
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
 
@@ -134,13 +134,17 @@ export default function MapScreen() {
 
   const handleCreateActivityAtPin = () => {
     if (droppedPin) {
-      router.push({
-        pathname: "/create-activity",
-        params: {
-          latitude: droppedPin.lat.toString(),
-          longitude: droppedPin.lng.toString(),
-        },
-      });
+      if (isGuest || !isAuthenticated) {
+        router.push('/login?from=create-activity');
+      } else {
+        router.push({
+          pathname: "/create-activity",
+          params: {
+            latitude: droppedPin.lat.toString(),
+            longitude: droppedPin.lng.toString(),
+          },
+        });
+      }
     }
   };
 
@@ -238,15 +242,15 @@ export default function MapScreen() {
       title: activity.title,
     }));
 
-    // Convert users to friends (simulate nearby friends)
-    const friendsData: Friend[] = activities
+    // Convert users to friends (simulate nearby friends) - Only for authenticated users
+    const friendsData: Friend[] = (isAuthenticated && !isGuest) ? activities
       .slice(0, 3)
       .map((activity, index) => ({
         id: activity._id,
         lat: activity.location.latitude + (Math.random() - 0.5) * 0.01, // Random location near activity
         lng: activity.location.longitude + (Math.random() - 0.5) * 0.01,
         name: activity.title,
-      }));
+      })) : [];
 
     // Generate heat points for activity density
     const heatData: HeatPoint[] = [
@@ -260,9 +264,19 @@ export default function MapScreen() {
     setEvents(eventsData);
     setFriends(friendsData);
     setHeat(heatData);
-  }, [activities, userLocation]);
+  }, [activities, userLocation, isAuthenticated, isGuest]);
 
-  if (!userLocation) return null;
+  // Show loading screen while getting user location
+  if (!userLocation) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+        <FontAwesome name="map-pin" size={48} color={colors.foreground} />
+        <Text style={{ color: colors.foreground, marginTop: 16, fontSize: 18 }}>
+          Getting your location...
+        </Text>
+      </View>
+    );
+  }
 
   // Fallback component for when Mapbox is not available
   const MapFallback = () => (
@@ -280,11 +294,13 @@ export default function MapScreen() {
           Your location: {userLocation.latitude.toFixed(4)},{" "}
           {userLocation.longitude.toFixed(4)}
         </Text>
-        <Text style={[styles.fallbackText, { color: colors.muted }]}>
-          Friends nearby: {friends.length}
-        </Text>
+        {isAuthenticated && !isGuest && (
+          <Text style={[styles.fallbackText, { color: colors.muted }]}>
+            Friends nearby: {friends.length}
+          </Text>
+        )}
         <Text style={[styles.fallbackText, { color: colors.muted }]}>Events nearby: {events.length}</Text>
-        {ghostMode && (
+        {isAuthenticated && !isGuest && ghostMode && (
           <View style={styles.ghostModeContainer}>
             <FontAwesome name="eye-slash" size={16} color={colors.muted} />
             <Text style={[styles.ghostModeText, { color: colors.muted }]}>Ghost Mode Active</Text>
@@ -325,7 +341,7 @@ export default function MapScreen() {
           onPress={() => router.push("/create-activity")}
           style={styles.searchButton}
         >
-          <FontAwesome name="plus" size={24} color={colors.foreground} />
+          <FontAwesome name="plus" size={24} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
@@ -374,8 +390,8 @@ export default function MapScreen() {
             </MapboxGL.PointAnnotation>
           )}
 
-          {/* Friends markers */}
-          {friends.map((friend) => (
+          {/* Friends markers - Only show for authenticated users */}
+          {isAuthenticated && !isGuest && friends.map((friend) => (
             <MapboxGL.PointAnnotation
               key={friend.id}
               id={friend.id}
@@ -504,7 +520,13 @@ export default function MapScreen() {
                     <View style={styles.droppedPinActions}>
                       <TouchableOpacity
                         style={[styles.createAtPinButton, { backgroundColor: colors.foreground }]}
-                        onPress={handleCreateActivityAtPin}
+                        onPress={() => {
+                          if (isGuest || !isAuthenticated) {
+                            router.push('/login?from=create-activity');
+                          } else {
+                            handleCreateActivityAtPin();
+                          }
+                        }}
                       >
                         <FontAwesome name="plus" size={16} color={colors.background} />
                         <Text style={[styles.createAtPinText, { color: colors.background }]}>

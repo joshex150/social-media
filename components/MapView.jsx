@@ -44,8 +44,8 @@ export default function MapView({ event, participants }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="map-view">
-      <Text style={[styles.location, { color: colors.foreground }]} testID="event-location">{location}</Text>
-      <Text style={[styles.participants, { color: colors.muted }]} testID="participants-count">
+      <Text style={[styles.location, { backgroundColor: colors.surface, borderColor: colors.border },]} testID="event-location">{location}</Text>
+      <Text style={[styles.participants, { backgroundColor: colors.surface, borderColor: colors.border },]} testID="participants-count">
         {participants.length} participants
       </Text>
       
@@ -100,14 +100,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
     padding: 16,
-    backgroundColor: '#fff',
+    // backgroundColor: '#fff',
   },
   participants: {
     fontSize: 14,
     color: '#666',
     paddingHorizontal: 16,
     paddingBottom: 8,
-    backgroundColor: '#fff',
+    // backgroundColor: '#fff',
   },
   map: {
     flex: 1,

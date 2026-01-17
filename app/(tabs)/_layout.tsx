@@ -15,6 +15,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useApi } from "@/contexts/ApiContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useNavigationGuard } from "@/hooks/useNavigationGuard";
+import { usePreventDoublePress } from "@/hooks/usePreventDoublePress";
+import { ThemedLogo } from "@/components";
 
 // Import each screen statically
 import HomeScreen from "./index";
@@ -93,10 +96,12 @@ export default function TabLayout() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
+  const hasInitializedRef = useRef(false);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isAuthenticated, isGuest, isLoading } = useApi();
+  const { safeReplace, safePush } = useNavigationGuard();
 
   // All variables and calculations that don't depend on hooks
   const TOTAL_GAP = 12; // total gap between pages
@@ -105,16 +110,32 @@ export default function TabLayout() {
   const gapColor = colors.background;
   const pageColor = colors.background;
 
+  // Track if we're navigating to login to prevent double navigation
+  const isNavigatingToLoginRef = useRef(false);
+
+  // Handler for create tab press (guests)
+  const handleCreateTabPress = usePreventDoublePress(() => {
+    if (isNavigatingToLoginRef.current) {
+      return;
+    }
+    isNavigatingToLoginRef.current = true;
+    // Reset the flag after navigation completes
+    setTimeout(() => {
+      isNavigatingToLoginRef.current = false;
+    }, 1000);
+    safeReplace("/login?from=create-activity");
+  }, 500);
+
   // All useCallback hooks must be called before any early returns
   const handleTabPress = useCallback((index: number) => {
     const screen = availableScreens[index];
     if (screen.name === "create") {
       // Redirect guests to login when trying to create activity
       if (isGuest) {
-        router.replace("/login?from=create-activity");
+        handleCreateTabPress();
         return;
       }
-      router.push("/create-activity");
+      safePush("/create-activity");
       return;
     }
     
@@ -126,9 +147,14 @@ export default function TabLayout() {
         animated: true,
       });
     }
-  }, [availableScreens, availableScreenComponents, router, isGuest]);
+  }, [availableScreens, availableScreenComponents, isGuest, safePush, handleCreateTabPress]);
 
   const handleScroll = useCallback((event: any) => {
+    // Prevent scroll handler from firing on initial mount
+    if (!hasInitializedRef.current) {
+      return;
+    }
+    
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     const pageWidth = screenWidth + TOTAL_GAP;
     const newIndex = Math.round(contentOffsetX / pageWidth);
@@ -171,16 +197,26 @@ export default function TabLayout() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isGuest) {
-      router.replace("/login");
+      safeReplace("/login");
     }
-  }, [isAuthenticated, isGuest, isLoading, router]);
+  }, [isAuthenticated, isGuest, isLoading, safeReplace]);
+
+  // Initialize scroll position and mark as initialized after mount
+  useEffect(() => {
+    // Small delay to ensure ScrollView is fully rendered
+    const timer = setTimeout(() => {
+      hasInitializedRef.current = true;
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // Show loading screen while checking authentication
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <FontAwesome name="users" size={48} color={colors.foreground} />
+          <ThemedLogo size={48} />
           <Text style={[styles.loadingText, { color: colors.foreground }]}>Link Up</Text>
           <Text style={[styles.loadingSubtext, { color: colors.muted }]}>Loading...</Text>
         </View>
@@ -188,9 +224,17 @@ export default function TabLayout() {
     );
   }
 
-  // Don't render if not authenticated
+  // Show loading screen while redirecting if not authenticated
   if (!isAuthenticated && !isGuest) {
-    return null;
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ThemedLogo size={48} />
+          <Text style={[styles.loadingText, { color: colors.foreground }]}>Link Up</Text>
+          <Text style={[styles.loadingSubtext, { color: colors.muted }]}>Redirecting...</Text>
+        </View>
+      </View>
+    );
   }
 
   return (

@@ -6,7 +6,6 @@ import {
   Text,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -23,6 +22,7 @@ import {
   PADDING,
   MARGIN,
   GAPS,
+  SPACING,
   FONT_SIZES,
   FONT_WEIGHTS,
   BORDER_RADIUS,
@@ -167,11 +167,12 @@ export default function ManageActivityScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Remove Participant',
       'Are you sure you want to remove this participant?',
+      'warning',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Remove',
           style: 'destructive',
@@ -244,11 +245,12 @@ export default function ManageActivityScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Delete Activity',
       'Are you sure you want to delete this activity? This action cannot be undone.',
+      'warning',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Delete',
           style: 'destructive',
@@ -731,55 +733,59 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: PADDING.lg,
+    padding: SPACING.lg,
   },
   loadingText: {
     fontSize: FONT_SIZES.md,
-    marginTop: MARGIN.md,
+    marginTop: MARGIN.component.top,
   },
   errorTitle: {
     fontSize: FONT_SIZES.xl,
     fontWeight: FONT_WEIGHTS.bold,
-    marginTop: MARGIN.md,
-    marginBottom: MARGIN.sm,
+    marginTop: MARGIN.component.top,
+    marginBottom: MARGIN.card.bottom,
   },
   errorSubtitle: {
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
-    marginBottom: MARGIN.lg,
-    paddingHorizontal: PADDING.lg,
+    marginBottom: MARGIN.section.bottom,
+    paddingHorizontal: PADDING.content.horizontal,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: PADDING.md,
-    paddingVertical: PADDING.sm,
+    paddingHorizontal: PADDING.header.horizontal,
+    paddingVertical: PADDING.header.vertical,
     borderBottomWidth: 1,
   },
   backButton: {
-    padding: PADDING.xs,
+    padding: SPACING.xs,
+  },
+  backButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
   },
   title: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
     flex: 1,
-    marginHorizontal: MARGIN.sm,
+    marginHorizontal: MARGIN.card.bottom,
   },
   headerSpacer: {
     width: 32,
   },
   banner: {
-    padding: PADDING.md,
+    padding: PADDING.card.horizontal,
     borderBottomWidth: 1,
   },
   bannerTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
-    marginBottom: MARGIN.xs,
+    marginBottom: MARGIN.text.bottom,
   },
   bannerSubtitle: {
     fontSize: FONT_SIZES.sm,
-    marginTop: MARGIN.xs,
+    marginTop: MARGIN.text.top,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -790,9 +796,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: PADDING.sm,
-    paddingHorizontal: PADDING.xs,
-    gap: GAPS.xs,
+    paddingVertical: PADDING.content.vertical,
+    paddingHorizontal: SPACING.xs,
+    gap: GAPS.small,
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -805,31 +811,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabContentContainer: {
-    padding: PADDING.md,
+    padding: PADDING.card.horizontal,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: PADDING.xl * 2,
+    paddingVertical: SPACING.xl * 2,
   },
   emptyTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
-    marginTop: MARGIN.md,
-    marginBottom: MARGIN.xs,
+    marginTop: MARGIN.component.top,
+    marginBottom: MARGIN.text.bottom,
   },
   emptySubtitle: {
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
   },
   requestCard: {
-    borderRadius: BORDER_RADIUS.md,
-    padding: PADDING.md,
-    marginBottom: MARGIN.md,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginBottom: MARGIN.component.bottom,
     borderWidth: 1,
   },
   requestHeader: {
-    marginBottom: MARGIN.sm,
+    marginBottom: MARGIN.card.bottom,
   },
   requestUserInfo: {
     flexDirection: 'row',
@@ -841,7 +847,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: MARGIN.sm,
+    marginRight: MARGIN.card.bottom,
   },
   requestUserDetails: {
     flex: 1,
@@ -852,22 +858,22 @@ const styles = StyleSheet.create({
   },
   requestTime: {
     fontSize: FONT_SIZES.xs,
-    marginTop: MARGIN.xs / 2,
+    marginTop: MARGIN.text.bottom / 2,
   },
   requestMessage: {
     fontSize: FONT_SIZES.sm,
-    marginBottom: MARGIN.sm,
+    marginBottom: MARGIN.card.bottom,
     fontStyle: 'italic',
   },
   requestActions: {
     flexDirection: 'row',
-    gap: GAPS.sm,
-    marginTop: MARGIN.sm,
+    gap: GAPS.small,
+    marginTop: MARGIN.card.bottom,
   },
   requestButton: {
     flex: 1,
-    paddingVertical: PADDING.sm,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: PADDING.content.vertical,
+    borderRadius: BORDER_RADIUS.small,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -882,14 +888,14 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.medium,
   },
   infoCard: {
-    borderRadius: BORDER_RADIUS.md,
-    padding: PADDING.md,
-    marginBottom: MARGIN.md,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginBottom: MARGIN.component.bottom,
   },
   infoTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.bold,
-    marginBottom: MARGIN.xs,
+    marginBottom: MARGIN.text.bottom,
   },
   infoSubtitle: {
     fontSize: FONT_SIZES.sm,
@@ -898,9 +904,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: BORDER_RADIUS.md,
-    padding: PADDING.md,
-    marginBottom: MARGIN.sm,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginBottom: MARGIN.card.bottom,
     borderWidth: 1,
   },
   participantInfo: {
@@ -922,22 +928,22 @@ const styles = StyleSheet.create({
   removeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: PADDING.xs,
-    paddingHorizontal: PADDING.sm,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: PADDING.content.vertical,
+    borderRadius: BORDER_RADIUS.small,
     borderWidth: 1,
-    gap: GAPS.xs,
+    gap: GAPS.small,
   },
   removeButtonText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.medium,
   },
   formGroup: {
-    marginBottom: MARGIN.md,
+    marginBottom: MARGIN.component.bottom,
   },
   formRow: {
     flexDirection: 'row',
-    gap: GAPS.md,
+    gap: GAPS.medium,
   },
   formGroupHalf: {
     flex: 1,
@@ -945,18 +951,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.medium,
-    marginBottom: MARGIN.xs,
+    marginBottom: MARGIN.text.bottom,
   },
   input: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.sm,
-    padding: PADDING.sm,
+    borderRadius: BORDER_RADIUS.small,
+    padding: PADDING.input.horizontal,
     fontSize: FONT_SIZES.md,
   },
   textArea: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.sm,
-    padding: PADDING.sm,
+    borderRadius: BORDER_RADIUS.small,
+    padding: PADDING.input.horizontal,
     fontSize: FONT_SIZES.md,
     minHeight: 100,
     textAlignVertical: 'top',
@@ -965,19 +971,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: PADDING.md,
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: MARGIN.md,
-    gap: GAPS.sm,
+    paddingVertical: PADDING.card.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+    marginTop: MARGIN.component.bottom,
+    gap: GAPS.small,
   },
   saveButtonText: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.bold,
   },
   settingCard: {
-    borderRadius: BORDER_RADIUS.md,
-    padding: PADDING.md,
-    marginBottom: MARGIN.sm,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: PADDING.card.horizontal,
+    marginBottom: MARGIN.card.bottom,
     borderWidth: 1,
   },
   settingRow: {
@@ -991,7 +997,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.medium,
-    marginBottom: MARGIN.xs / 2,
+    marginBottom: MARGIN.text.bottom / 2,
   },
   settingValue: {
     fontSize: FONT_SIZES.sm,
@@ -1000,10 +1006,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: PADDING.md,
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: MARGIN.lg,
-    gap: GAPS.sm,
+    paddingVertical: PADDING.card.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+    marginTop: MARGIN.section.bottom,
+    gap: GAPS.small,
   },
   deleteButtonText: {
     fontSize: FONT_SIZES.md,

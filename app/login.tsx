@@ -15,7 +15,9 @@ import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useApi } from "@/contexts/ApiContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
+import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 import CustomAlert from "@/components/CustomAlert";
+import { ThemedLogo } from "@/components";
 import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
 
 export default function LoginScreen() {
@@ -34,6 +36,7 @@ export default function LoginScreen() {
   const params = useLocalSearchParams();
   const safeArea = useSafeAreaStyle();
   const { login, register, continueAsGuest, isAuthenticated, isGuest, isLoading } = useApi();
+  const { safeReplace } = useNavigationGuard();
 
   // Track if user was already a guest when component mounted (only set once when isGuest first becomes available)
   React.useEffect(() => {
@@ -47,10 +50,17 @@ export default function LoginScreen() {
     // Only run if we have authentication state and haven't navigated yet
     // Skip if we're in the process of becoming a guest (continueAsGuest handles navigation)
     if ((isAuthenticated || isGuest) && !hasNavigated && !isBecomingGuest) {
-      // If guest navigated to login page explicitly (no params.from), let them stay
-      // They want to log in, so don't redirect them back
-      // BUT if guestOnMountRef is false, they just clicked "Continue as Guest", so allow redirect
-      if (isGuest && !params.from && guestOnMountRef.current !== false) {
+      // If guest has params.from, they're trying to access a protected route
+      // They need to log in first, so let them stay on the login page
+      if (isGuest && params.from) {
+        // Guest is trying to access a protected route - they need to log in
+        // Don't redirect them, let them stay on login page
+        return;
+      }
+      
+      // If guest navigated to login page explicitly (no params.from), 
+      // and they were already a guest when they mounted, let them stay to log in
+      if (isGuest && !params.from && guestOnMountRef.current === true) {
         // Guest explicitly navigated to login page - let them stay to log in
         return;
       }
@@ -62,15 +72,7 @@ export default function LoginScreen() {
         if (isGuest && !guestOnMountRef.current) {
           // console.log('Guest user just became guest, redirecting to main app...');
           setHasNavigated(true);
-          router.replace("/(tabs)");
-          return;
-        }
-        
-        // If guest was already a guest and has params.from (trying to access protected route), redirect back
-        if (isGuest && params.from) {
-          // console.log('Guest user trying to access protected route, redirecting to main app...');
-          setHasNavigated(true);
-          router.replace("/(tabs)");
+          safeReplace("/(tabs)");
           return;
         }
         
@@ -86,11 +88,11 @@ export default function LoginScreen() {
             if (params.from === 'create-activity') {
               // console.log('Redirecting to create-activity page...');
               setHasNavigated(true);
-              router.replace('/create-activity');
+              safeReplace('/create-activity');
             } else {
               // console.log('Redirecting to main app...');
               setHasNavigated(true);
-              router.replace("/(tabs)");
+              safeReplace("/(tabs)");
             }
           } else {
             // If user came from a protected route but needs onboarding, 
@@ -98,18 +100,18 @@ export default function LoginScreen() {
             if (params.from === 'create-activity') {
               // console.log('Redirecting to onboarding, then create-activity...');
               setHasNavigated(true);
-              router.replace('/onboarding?redirect=create-activity');
+              safeReplace('/onboarding?redirect=create-activity');
             } else {
               // console.log('Redirecting to onboarding...');
               setHasNavigated(true);
-              router.replace("/onboarding");
+              safeReplace("/onboarding");
             }
           }
         }
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isGuest, router, params.from, isBecomingGuest, hasNavigated]);
+  }, [isAuthenticated, isGuest, params.from, isBecomingGuest, hasNavigated, safeReplace]);
 
   // Reset navigation flag when authentication state changes
   React.useEffect(() => {
@@ -206,7 +208,7 @@ export default function LoginScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={[styles.logoContainer, { backgroundColor: colors.surface }]}>
-              <FontAwesome name="users" size={48} color={colors.foreground} />
+              <ThemedLogo size={48} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>
               {isLogin ? "Welcome Back" : "Join Link Up"}
@@ -289,35 +291,37 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Continue as Guest Button */}
-            <TouchableOpacity
-              style={[styles.guestButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
-              onPress={async () => {
-                if (params.from) {
-                  // If trying to access a protected route, switch to registration form
-                  // Creating an account doesn't require authentication
-                  setIsLogin(false);
-                  // Clear form fields
-                  setName("");
-                  setEmail("");
-                  setPassword("");
-                  setConfirmPassword("");
-                } else {
-                  // Normal guest flow - let useEffect handle navigation after state is set
-                  setIsBecomingGuest(true);
-                  setHasNavigated(false); // Reset navigation flag to allow redirect
-                  guestOnMountRef.current = false; // Reset ref so redirect logic knows they just became a guest
-                  await continueAsGuest();
-                  setIsBecomingGuest(false);
-                  // useEffect will detect isGuest and navigate
-                }
-              }}
-              disabled={isLoading}
-            >
-              <Text style={[styles.guestButtonText, { color: colors.foreground }]}>
-                {params.from ? "Create Account to Continue" : "Continue as Guest"}
-              </Text>
-            </TouchableOpacity>
+            {/* Continue as Guest Button - Only show on login page, not on register page */}
+            {isLogin && (
+              <TouchableOpacity
+                style={[styles.guestButton, { backgroundColor: colors.background, borderColor: colors.foreground }]}
+                onPress={async () => {
+                  if (params.from) {
+                    // If trying to access a protected route, switch to registration form
+                    // Creating an account doesn't require authentication
+                    setIsLogin(false);
+                    // Clear form fields
+                    setName("");
+                    setEmail("");
+                    setPassword("");
+                    setConfirmPassword("");
+                  } else {
+                    // Normal guest flow - let useEffect handle navigation after state is set
+                    setIsBecomingGuest(true);
+                    setHasNavigated(false); // Reset navigation flag to allow redirect
+                    guestOnMountRef.current = false; // Reset ref so redirect logic knows they just became a guest
+                    await continueAsGuest();
+                    setIsBecomingGuest(false);
+                    // useEffect will detect isGuest and navigate
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text style={[styles.guestButtonText, { color: colors.foreground }]}>
+                  {params.from ? "Create Account to Continue" : "Continue as Guest"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Toggle Login/Register */}

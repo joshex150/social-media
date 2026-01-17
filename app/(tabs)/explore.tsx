@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, RefreshControl } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useRouter } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -29,7 +30,7 @@ export default function ExploreScreen() {
   const [selectedRadius, setSelectedRadius] = useState(10);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+  const [activityMode, setActivityMode] = useState<'normal' | 'side-quest' | null>(null);
 
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
@@ -47,6 +48,47 @@ export default function ExploreScreen() {
     if (category !== 'all') {
       filtered = filtered.filter(activity => activity.category === category);
     }
+
+    // Apply mode-based filtering
+    if (activityMode) {
+      const userInterests = user?.preferences?.categories || [];
+      
+      if (activityMode === 'normal') {
+        // Normal mode: Show activities based on interests, prioritize lower plan creators (free/silver)
+        if (userInterests.length > 0) {
+          filtered = filtered.filter(activity => {
+            // Filter by interests
+            return userInterests.includes(activity.category);
+          });
+        }
+        // If no interests, show all activities but still prioritize by plan
+        
+        // Sort: prioritize lower plan creators (free, silver) first
+        filtered.sort((a, b) => {
+          const planOrder = { 'free': 0, 'silver': 1, 'gold': 2, 'platinum': 3 };
+          const aPlan = planOrder[a.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          const bPlan = planOrder[b.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          return aPlan - bPlan;
+        });
+      } else if (activityMode === 'side-quest') {
+        // Side Quest mode: Show activities NOT in interests, prioritize higher plan creators (gold/platinum)
+        if (userInterests.length > 0) {
+          filtered = filtered.filter(activity => {
+            // Show activities that are NOT in user interests
+            return !userInterests.includes(activity.category);
+          });
+        }
+        // If no interests, show all activities (everything is "new")
+        
+        // Sort: prioritize higher plan creators (gold, platinum) first
+        filtered.sort((a, b) => {
+          const planOrder = { 'free': 3, 'silver': 2, 'gold': 1, 'platinum': 0 };
+          const aPlan = planOrder[a.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          const bPlan = planOrder[b.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          return aPlan - bPlan;
+        });
+      }
+    }
     
     setFilteredActivities(filtered);
   };
@@ -57,7 +99,22 @@ export default function ExploreScreen() {
 
   useEffect(() => {
     filterActivities(activities, selectedRadius, selectedCategory);
-  }, [activities, selectedRadius, selectedCategory]);
+  }, [activities, selectedRadius, selectedCategory, activityMode, user?.preferences?.categories]);
+
+  // Load saved mode on mount
+  useEffect(() => {
+    const loadMode = async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem('activityMode');
+        if (savedMode) {
+          setActivityMode(savedMode as 'normal' | 'side-quest');
+        }
+      } catch (error) {
+        // Ignore errors
+      }
+    };
+    loadMode();
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -107,9 +164,11 @@ export default function ExploreScreen() {
     router.push(`/activity/${activityId}`);
   };
 
-  const handleVibeFeedback = async (vibe: string) => {
-    setVibeFeedback(vibe);
-    showAlert('Thank you!', 'Your feedback has been recorded.', 'success');
+  const handleVibeFeedback = async (mode: string) => {
+    setActivityMode(mode as 'normal' | 'side-quest');
+    showAlert('Mode Selected!', `You're now in ${mode === 'normal' ? 'Normal Mode' : 'Side Quest Mode'}`, 'success');
+    // Re-filter activities with new mode
+    filterActivities(activities, selectedRadius, selectedCategory);
   };
 
   return (

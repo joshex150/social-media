@@ -12,6 +12,7 @@ import { ApiProvider, useApi } from "@/contexts/ApiContext";
 import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
 import { View, Text, StyleSheet, LogBox } from "react-native";
 import { ErrorBoundary } from "@/components";
+import Logo from "@/components/Logo";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -70,14 +71,19 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+  // Don't hide splash screen here - wait for auth to complete
+  // The splash will be hidden in AppNavigator after auth loads
 
   if (!loaded) {
-    return null;
+    // Show loading screen while fonts are loading
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <Logo size={64} animated={true} color="#ffffff" />
+        <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold', marginTop: 16 }}>
+          Link Up
+        </Text>
+      </View>
+    );
   }
 
   return <RootLayoutNav />;
@@ -108,7 +114,15 @@ function RootLayoutNav() {
   }
 
   if (!isReady) {
-    return null; // Or a minimal loading screen
+    // Show loading screen while modules are initializing
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <Logo size={120} animated={true} color="#ffffff" />
+        {/* <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold', marginTop: 16 }}>
+          Link Up
+        </Text> */}
+      </View>
+    );
   }
 
   return (
@@ -136,29 +150,56 @@ function AppNavigator() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.warn("App loading timeout, forcing navigation");
       setForceShow(true);
     }, 3000);
 
     return () => clearTimeout(timeout);
   }, []);
 
+  const [splashHidden, setSplashHidden] = useState(false);
+
+  // Hide splash screen once auth is ready
+  useEffect(() => {
+    if (!isLoading || forceShow) {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync()
+          .then(() => {
+            setSplashHidden(true);
+          })
+          .catch(() => {
+            // Ignore errors if splash is already hidden
+            setSplashHidden(true);
+          });
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, forceShow]);
+
   if (isLoading && !forceShow) {
     return (
       <View
         style={[
           styles.loadingContainer,
-          { backgroundColor: colors.background },
+          { backgroundColor: '#000000' }, // Always black to match splash screen
         ]}
       >
-        <FontAwesome name="users" size={48} color={colors.foreground} />
-        <Text style={[styles.loadingText, { color: colors.foreground }]}>
+        <Logo size={120} animated={true} color="#ffffff" />
+        {/* <Text style={[styles.loadingText, { color: '#ffffff' }]}>
           Link Up
-        </Text>
-        <Text style={[styles.loadingSubtext, { color: colors.muted }]}>
+        </Text> */}
+        {/* <Text style={[styles.loadingSubtext, { color: '#999999' }]}>
           Loading...
-        </Text>
+        </Text> */}
       </View>
+    );
+  }
+
+  // Show black background until splash is fully hidden to prevent white flash
+  if (!splashHidden) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000000' }} />
     );
   }
 
@@ -169,6 +210,7 @@ function AppNavigator() {
         gestureEnabled: true,
         animation: "slide_from_right",
         gestureDirection: "horizontal",
+        contentStyle: { backgroundColor: colors.background }, // Use theme background after splash is hidden
       }}
     >
       <Stack.Screen
@@ -192,6 +234,22 @@ function AppNavigator() {
           gestureEnabled: false, // Disable swipe back gesture
           ...(!hasAccess && { href: null }), // Hide tabs when not authenticated and not guest
         }}
+      />
+      <Stack.Screen 
+        name="create-activity" 
+        options={{ 
+          presentation: "modal",
+          headerShown: false,
+          gestureEnabled: true, // Allow swipe to dismiss
+        }} 
+      />
+      <Stack.Screen 
+        name="edit-profile" 
+        options={{ 
+          presentation: "modal",
+          headerShown: false,
+          gestureEnabled: true, // Allow swipe to dismiss
+        }} 
       />
       <Stack.Screen name="modal" options={{ presentation: "modal" }} />
     </Stack>

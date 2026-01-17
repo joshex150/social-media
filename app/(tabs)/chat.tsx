@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Modal, Dimensions } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useRouter } from "expo-router";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
@@ -26,17 +27,20 @@ export default function ChatScreen() {
   const errorHandler = useErrorHandler();
 
   const safeArea = useSafeAreaStyle();
-  const { 
-    chats, 
-    loadChats, 
-    sendMessage, 
-    getChatMessages, 
+  const router = useRouter();
+  const {
+    chats,
+    loadChats,
+    sendMessage,
+    getChatMessages,
     markChatAsRead,
     startTyping,
     stopTyping,
     getTypingUsers,
     isSocketConnected,
-    user 
+    user,
+    isAuthenticated,
+    isGuest
   } = useApi();
 
   useEffect(() => {
@@ -53,10 +57,10 @@ export default function ChatScreen() {
     setCurrentPage(1);
     setHasMore(true);
     setMessages([]);
-    
+
     // Load initial messages
     await loadChatMessages(chat.id, 1);
-    
+
     // Mark chat as read
     markChatAsRead(chat.id);
   };
@@ -65,12 +69,12 @@ export default function ChatScreen() {
     try {
       const response = await getChatMessages(chatId, page);
       if (response.success) {
-        const messages = response.messages || response.data?.messages || [];
-        const pagination = response.pagination || response.data?.pagination || {};
-        
+        const messages = response.messages || [];
+        const pagination = response.pagination || {};
+
         // Check if there are actually messages returned
         const hasMessages = messages.length > 0;
-        
+
         // Determine if there are more messages
         // Check multiple possible response structures
         let hasMoreMessages = false;
@@ -84,11 +88,26 @@ export default function ChatScreen() {
           // If no pagination info, assume no more if we got fewer messages than requested
           hasMoreMessages = hasMessages && messages.length >= 20;
         }
-        
+
+        // Sort messages by timestamp (newest to oldest) for inverted FlatList
+        const sortedMessages = [...messages].sort((a, b) => {
+          const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
+          const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+          return timeB - timeA; // Descending: newest first
+        });
+
         if (page === 1) {
-          setMessages(messages);
+          setMessages(sortedMessages);
         } else {
-          setMessages(prev => [...messages, ...prev]);
+          // When loading older messages, prepend them and sort the entire array
+          setMessages(prev => {
+            const combined = [...sortedMessages, ...prev];
+            return combined.sort((a, b) => {
+              const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
+              const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+              return timeB - timeA; // Descending: newest first
+            });
+          });
         }
         setHasMore(hasMoreMessages);
         setCurrentPage(page);
@@ -107,7 +126,7 @@ export default function ChatScreen() {
 
   const handleLoadMore = async () => {
     if (!selectedChat || !hasMore || isLoadingMore) return;
-    
+
     setIsLoadingMore(true);
     try {
       await loadChatMessages(selectedChat.id, currentPage + 1);
@@ -122,7 +141,7 @@ export default function ChatScreen() {
 
   const handleTyping = (isTyping: boolean) => {
     if (!selectedChat) return;
-    
+
     if (isTyping) {
       startTyping(selectedChat.id);
     } else {
@@ -132,7 +151,7 @@ export default function ChatScreen() {
 
   const handleSendMessage = async (message: string) => {
     if (!selectedChat) return;
-    
+
     try {
       const result = await sendMessage(selectedChat.id, message);
       if (result.success) {
@@ -151,7 +170,7 @@ export default function ChatScreen() {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
     return `${Math.floor(diffInHours / 24)}d ago`;
@@ -180,41 +199,55 @@ export default function ChatScreen() {
         {/* Content */}
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
 
-        {/* Chats List */}
-        {chats?.length > 0 ? (
-          chats.map((chat) => (
-            <TouchableOpacity
-              key={chat.id}
-              style={[styles.chatItem, { borderBottomColor: colors.border }]}
-              onPress={() => handleChatSelect(chat)}
-            >
-              <View style={[styles.chatAvatar, { backgroundColor: colors.surface }]}>
-                <FontAwesome name="users" size={20} color={colors.foreground} />
-              </View>
-              <View style={styles.chatContent}>
-                <Text style={[styles.chatEventTitle, { color: colors.foreground }]}>{chat.activityTitle}</Text>
-                <Text style={[styles.chatLastMessage, { color: colors.muted }]}>{chat.lastMessage.text}</Text>
-                <Text style={[styles.chatTime, { color: colors.muted }]}>{formatTime(chat.lastMessage.timestamp)}</Text>
-              </View>
-              <View style={styles.chatMeta}>
-                <Text style={[styles.participantCount, { color: colors.muted }]}>{chat.participants}</Text>
-                {chat.unreadCount > 0 && (
-                  <View style={[styles.unreadBadge, { backgroundColor: colors.error }]}>
-                    <Text style={[styles.unreadText, { color: colors.background }]}>{chat.unreadCount}</Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <FontAwesome name="comment-o" size={48} color={colors.muted} />
-            <Text style={[styles.emptyTitle, { color: colors.muted }]}>No active chats</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
-              Join an activity to start chatting with other participants
-            </Text>
-          </View>
-        )}
+          {/* Chats List - Only show for authenticated users */}
+          {isGuest || !isAuthenticated ? (
+            <View style={styles.emptyState}>
+              <FontAwesome name="comment-o" size={48} color={colors.muted} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Login Required</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
+                Please login to access your messages and chat with other participants
+              </Text>
+              <TouchableOpacity
+                style={[styles.loginButton, { backgroundColor: colors.accent }]}
+                onPress={() => router.push('/login')}
+              >
+                <Text style={[styles.loginButtonText, { color: colors.background }]}>Login</Text>
+              </TouchableOpacity>
+            </View>
+          ) : chats?.length > 0 ? (
+            chats.map((chat) => (
+              <TouchableOpacity
+                key={chat.id}
+                style={[styles.chatItem, { borderBottomColor: colors.border }]}
+                onPress={() => handleChatSelect(chat)}
+              >
+                <View style={[styles.chatAvatar, { backgroundColor: colors.surface }]}>
+                  <FontAwesome name="users" size={20} color={colors.foreground} />
+                </View>
+                <View style={styles.chatContent}>
+                  <Text style={[styles.chatEventTitle, { color: colors.foreground }]}>{chat.activityTitle}</Text>
+                  <Text style={[styles.chatLastMessage, { color: colors.muted }]}>{chat.lastMessage.text}</Text>
+                  <Text style={[styles.chatTime, { color: colors.muted }]}>{formatTime(chat.lastMessage.timestamp)}</Text>
+                </View>
+                <View style={styles.chatMeta}>
+                  <Text style={[styles.participantCount, { color: colors.muted }]}>{chat.participants}</Text>
+                  {chat.unreadCount > 0 && (
+                    <View style={[styles.unreadBadge, { backgroundColor: colors.error }]}>
+                      <Text style={[styles.unreadText, { color: colors.background }]}>{chat.unreadCount}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <FontAwesome name="comment-o" size={48} color={colors.muted} />
+              <Text style={[styles.emptyTitle, { color: colors.muted }]}>No active chats</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
+                Join an activity to start chatting with other participants
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </View>
 
@@ -235,7 +268,7 @@ export default function ChatScreen() {
               <Text style={[styles.chatSubtitle, { color: colors.muted }]}>{selectedChat?.participants} participants</Text>
             </View>
           </View>
-          
+
           <View style={styles.chatContainer}>
             <ChatBox
               messages={messages}
@@ -340,7 +373,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 14,
-    width:20
+    width: 20
   },
   participantCount: {
     fontSize: FONT_SIZES.xs,
@@ -399,6 +432,20 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: FONT_SIZES.md,
     textAlign: "center",
+    marginBottom: GAPS.large,
+  },
+  loginButton: {
+    borderRadius: BORDER_RADIUS.medium,
+    paddingVertical: PADDING.button.vertical,
+    paddingHorizontal: PADDING.button.horizontal * 2,
+    marginTop: GAPS.medium,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  },
+  loginButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
   },
   chatContainer: {
     flex: 1,

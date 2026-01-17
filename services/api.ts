@@ -23,6 +23,7 @@ export interface User {
   };
   preferences?: {
     radius: number;
+    categories?: string[];
     notifications: {
       email: boolean;
       push: boolean;
@@ -52,6 +53,7 @@ export interface Activity {
     _id: string;
     name: string;
     avatar?: string;
+    subscription?: 'free' | 'silver' | 'gold' | 'platinum';
   };
   createdAt: string;
   updatedAt: string;
@@ -600,13 +602,43 @@ export const subscriptionAPI = {
 // Helper function to get auth token from storage
 export const getAuthToken = async (): Promise<string | null> => {
   try {
-    // console.log('Getting auth token from storage...');
     const token = await AsyncStorage.getItem('authToken');
-    // console.log('Retrieved token:', token ? 'Token found' : 'No token found');
     return token;
   } catch (error) {
     console.error('Error getting auth token:', error);
     return null;
+  }
+};
+
+// Helper function to get cached user data from storage
+export const getCachedUser = async (): Promise<User | null> => {
+  try {
+    const userJson = await AsyncStorage.getItem('cachedUser');
+    if (userJson) {
+      return JSON.parse(userJson);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting cached user:', error);
+    return null;
+  }
+};
+
+// Helper function to save user data to storage
+export const saveCachedUser = async (user: User): Promise<void> => {
+  try {
+    await AsyncStorage.setItem('cachedUser', JSON.stringify(user));
+  } catch (error) {
+    console.error('Error saving cached user:', error);
+  }
+};
+
+// Helper function to remove cached user from storage
+export const removeCachedUser = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem('cachedUser');
+  } catch (error) {
+    console.error('Error removing cached user:', error);
   }
 };
 
@@ -629,6 +661,7 @@ export const saveAuthToken = async (token: string): Promise<void> => {
 export const removeAuthToken = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem('authToken');
+    await removeCachedUser(); // Also remove cached user when token is removed
   } catch (error) {
     console.error('Error removing auth token:', error);
   }
@@ -671,7 +704,7 @@ export const circleAPI = {
     return response.json();
   },
 
-  updateLocation: async (activityId: string, latitude: number, longitude: number, accuracy?: number, token: string) => {
+  updateLocation: async (activityId: string, latitude: number, longitude: number, token: string, accuracy?: number) => {
     const response = await fetch(`${API_BASE_URL}/circle/location`, {
       method: 'POST',
       headers: { 

@@ -59,12 +59,30 @@ export const useSocket = ({ token, isAuthenticated }: UseSocketParams) => {
       });
 
       newSocket.on('connect_error', (error: any) => {
-        // Only log connection errors occasionally to avoid spam
+        const errorMessage = error?.message || '';
+        const isAuthError = errorMessage.includes('Authentication error') || 
+                           errorMessage.includes('Invalid token') ||
+                           errorMessage.includes('No token provided');
+        
+        // Clean up socket on authentication errors
+        if (isAuthError) {
+          // Don't log authentication errors - they're expected when token is invalid/expired
+          // Just clean up the socket connection
+          if (socketRef.current) {
+            socketRef.current.close();
+            socketRef.current = null;
+            setSocket(null);
+            setIsConnected(false);
+          }
+          return;
+        }
+        
+        // Only log non-auth connection errors occasionally to avoid spam
         const now = Date.now();
         if (now - lastErrorLogTime.current > 5000) {
           // Only log errors at most once every 5 seconds
           lastErrorLogTime.current = now;
-          console.warn('Socket connection error:', error?.message || 'websocket error');
+          console.warn('Socket connection error:', errorMessage || 'websocket error');
         }
         setIsConnected(false);
       });

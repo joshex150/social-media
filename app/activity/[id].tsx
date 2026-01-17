@@ -13,7 +13,6 @@ import { useSafeAreaStyle } from '@/hooks/useSafeAreaStyle';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import MapView from '@/components/MapView';
-import ChatBox from '@/components/ChatBox';
 import FeedbackModal from '@/components/FeedbackModal';
 import HotAlertButton from '@/components/HotAlertButton';
 import { useApi } from '@/contexts/ApiContext';
@@ -34,6 +33,7 @@ export default function ActivityDetailsScreen() {
   const [activeTab, setActiveTab] = useState('details');
   const [showFeedback, setShowFeedback] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
   const [locationTrackingActive, setLocationTrackingActive] = useState(false);
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
@@ -52,6 +52,13 @@ export default function ActivityDetailsScreen() {
     const activityData = activities.find(a => a._id === id);
     if (activityData) {
       setActivity(activityData);
+      
+      // Check if user is the creator
+      const creator = activityData.createdBy && user?.id && (
+        activityData.createdBy._id?.toString() === user.id.toString() ||
+        (activityData.createdBy as any).id?.toString() === user.id.toString()
+      );
+      setIsCreator(!!creator);
       
       // Check if user is a participant (participants are now always populated as User objects)
       const participant = activityData.participants.some((p) => {
@@ -76,6 +83,13 @@ export default function ActivityDetailsScreen() {
   useEffect(() => {
     loadActivityData();
   }, [id, activities, chats, user]);
+
+  // Reset activeTab if user is not creator and chat tab is selected
+  useEffect(() => {
+    if (activeTab === 'chat' && !isCreator) {
+      setActiveTab('details');
+    }
+  }, [isCreator, activeTab]);
 
   // Location tracking during active events
   useEffect(() => {
@@ -121,8 +135,8 @@ export default function ActivityDetailsScreen() {
                 activity._id,
                 location.coords.latitude,
                 location.coords.longitude,
-                location.coords.accuracy || undefined,
-                token
+                token,
+                location.coords.accuracy || undefined
               );
             }
           } catch (error) {
@@ -305,15 +319,18 @@ export default function ActivityDetailsScreen() {
             Map
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'chat' && [styles.activeTab, { borderBottomColor: colors.foreground }]]}
-          onPress={() => setActiveTab('chat')}
-        >
-          <FontAwesome name="comment" size={18} color={activeTab === 'chat' ? colors.foreground : colors.muted} />
-          <Text style={[styles.tabText, { color: activeTab === 'chat' ? colors.foreground : colors.muted }]}>
-            Chat
-          </Text>
-        </TouchableOpacity>
+        {/* Chat tab - only visible to creator */}
+        {isCreator && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'chat' && [styles.activeTab, { borderBottomColor: colors.foreground }]]}
+            onPress={() => setActiveTab('chat')}
+          >
+            <FontAwesome name="comment" size={18} color={activeTab === 'chat' ? colors.foreground : colors.muted} />
+            <Text style={[styles.tabText, { color: activeTab === 'chat' ? colors.foreground : colors.muted }]}>
+              Chat
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Tab Content */}
@@ -434,19 +451,95 @@ export default function ActivityDetailsScreen() {
         </View>
       )}
 
-      {activeTab === 'chat' && chat && (
-        <View style={styles.tabContent}>
-          <ChatBox
-            messages={chat.messages || []}
-            onSendMessage={handleSendMessage}
-            onTyping={() => {}}
-            onLoadMore={() => {}}
-            hasMore={false}
-            isLoadingMore={false}
-            typingUsers={[]}
-            currentUserId={user?.id}
-          />
-        </View>
+      {activeTab === 'chat' && isCreator && chat && (
+        <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentContainer}>
+          {/* Chat Management Section */}
+          <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoTitle, { color: colors.foreground }]}>Chat Management</Text>
+            <Text style={[styles.description, { color: colors.muted, marginBottom: MARGIN.component.bottom }]}>
+              Manage who can send messages and control chat settings for this activity.
+            </Text>
+            
+            {/* Chat Enabled Toggle */}
+            <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Chat Enabled</Text>
+                <Text style={[styles.settingDescription, { color: colors.muted }]}>
+                  Allow participants to send messages in this chat
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.toggleButton, { backgroundColor: activity.chatEnabled ? colors.accent : colors.border }]}
+                onPress={() => {
+                  showAlert('Info', 'Chat settings management coming soon', 'info');
+                }}
+              >
+                <View style={[styles.toggleIndicator, { 
+                  backgroundColor: colors.background,
+                  transform: [{ translateX: activity.chatEnabled ? 20 : 0 }]
+                }]} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Who Can Send Messages */}
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Who Can Send Messages</Text>
+                <Text style={[styles.settingDescription, { color: colors.muted }]}>
+                  Control who has permission to send messages
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.settingButton, { backgroundColor: colors.border }]}
+                onPress={() => {
+                  showAlert('Info', 'Message permissions management coming soon', 'info');
+                }}
+              >
+                <Text style={[styles.settingButtonText, { color: colors.foreground }]}>All Participants</Text>
+                <FontAwesome name="chevron-right" size={14} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Chat Preview */}
+          <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoTitle, { color: colors.foreground }]}>Chat Preview</Text>
+            <Text style={[styles.description, { color: colors.muted, marginBottom: MARGIN.component.bottom }]}>
+              Preview recent messages from the activity chat.
+            </Text>
+            <View style={[styles.chatPreview, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              {chat.messages && chat.messages.length > 0 ? (
+                chat.messages.slice(-3).map((message: any) => (
+                  <View key={message.id || message._id} style={styles.chatPreviewMessage}>
+                    <Text style={[styles.chatPreviewSender, { color: colors.accent }]}>
+                      {message.senderName || message.sender}:
+                    </Text>
+                    <Text style={[styles.chatPreviewText, { color: colors.foreground }]} numberOfLines={2}>
+                      {message.text}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.chatPreviewEmpty, { color: colors.muted }]}>
+                  No messages yet
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* View Full Chat Button */}
+          <TouchableOpacity
+            style={[styles.viewChatButton, { backgroundColor: colors.foreground }]}
+            onPress={() => {
+              showAlert('Info', 'Full chat view coming soon', 'info');
+            }}
+          >
+            <FontAwesome name="comment" size={18} color={colors.background} />
+            <Text style={[styles.viewChatButtonText, { color: colors.background }]}>
+              View Full Chat
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       )}
 
       {/* Feedback Modal */}
@@ -650,5 +743,85 @@ const styles = StyleSheet.create({
   trackingText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.medium,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: PADDING.card.vertical,
+    borderBottomWidth: 1,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: GAPS.medium,
+  },
+  settingLabel: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
+    marginBottom: SPACING.xs,
+  },
+  settingDescription: {
+    fontSize: FONT_SIZES.sm,
+    lineHeight: FONT_SIZES.sm * 1.4,
+  },
+  toggleButton: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleIndicator: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
+  settingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.buttonSmall.vertical,
+    borderRadius: BORDER_RADIUS.medium,
+    gap: GAPS.small,
+  },
+  settingButtonText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  chatPreview: {
+    borderRadius: BORDER_RADIUS.medium,
+    borderWidth: 1,
+    padding: PADDING.card.horizontal,
+    maxHeight: 200,
+  },
+  chatPreviewMessage: {
+    marginBottom: MARGIN.text.bottom,
+  },
+  chatPreviewSender: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: FONT_WEIGHTS.semibold,
+    marginBottom: SPACING.xs,
+  },
+  chatPreviewText: {
+    fontSize: FONT_SIZES.sm,
+    lineHeight: FONT_SIZES.sm * 1.4,
+  },
+  chatPreviewEmpty: {
+    fontSize: FONT_SIZES.sm,
+    textAlign: 'center',
+    paddingVertical: PADDING.card.vertical,
+  },
+  viewChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BORDER_RADIUS.large,
+    paddingVertical: PADDING.button.vertical + 8,
+    marginTop: MARGIN.section.top,
+    gap: GAPS.medium,
+  },
+  viewChatButtonText: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
   },
 });

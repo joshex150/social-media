@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { authAPI, activitiesAPI, chatAPI, notificationsAPI, subscriptionAPI, getAuthToken, saveAuthToken, removeAuthToken, type User, type Activity, type Chat, type Notification, type SubscriptionTier, type JoinRequest } from '@/services/api';
+import { authAPI, activitiesAPI, chatAPI, notificationsAPI, subscriptionAPI, getAuthToken, saveAuthToken, removeAuthToken, getCachedUser, saveCachedUser, removeCachedUser, type User, type Activity, type Chat, type Notification, type SubscriptionTier, type JoinRequest } from '@/services/api';
 import { useRouter } from 'expo-router';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { useSocket } from '@/hooks/useSocket';
@@ -188,70 +188,91 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
 
   const initializeAuth = async () => {
     try {
-      // console.log('Initializing auth...');
       const savedToken = await getAuthToken();
-      // console.log('Saved token found:', !!savedToken);
       
       if (savedToken) {
         setToken(savedToken);
-        // console.log('Token set, attempting to fetch user data...');
+        
+        // Try to load cached user data first for instant authentication
+        const cachedUser = await getCachedUser();
+        if (cachedUser) {
+          setUser(cachedUser);
+          setIsGuest(false);
+        }
         
         try {
-          // Add aggressive timeout to the API call itself
+          // Increase timeout to 10 seconds to allow for slower connections
           const userResponse = await Promise.race([
             authAPI.getCurrentUser(savedToken),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('User API timeout')), 1000)
+              setTimeout(() => reject(new Error('User API timeout')), 10000)
             )
           ]);
           
-          // console.log('User response:', userResponse);
-          
           if (userResponse.success && userResponse.data && userResponse.data.user) {
-            setUser(userResponse.data.user);
-            // console.log('User set successfully:', userResponse.data.user.name);
+            const userData = userResponse.data.user;
+            setUser(userData);
+            setIsGuest(false);
+            // Cache the user data for future app reloads
+            await saveCachedUser(userData);
           } else {
-            // console.log('Token invalid or user data missing, clearing token');
-            await removeAuthToken();
-            setToken(null);
-            setUser(null);
-          }
-        } catch (apiError) {
-          console.warn('User API call failed, but keeping token for offline mode:', apiError);
-          // Don't clear the token if API fails - user might be offline
-          // Just set a placeholder user
-          setUser({ 
-            id: 'offline-user', 
-            name: 'User', 
-            email: 'user@example.com',
-            joinDate: new Date().toISOString(),
-            subscription: 'free',
-            stats: { 
-              activitiesCreated: 0, 
-              activitiesJoined: 0,
-              connectionsMade: 0,
-              streakDays: 0
+            // Check if token is expired or invalid
+            if (userResponse.message === 'Token expired' || userResponse.message === 'Invalid token' || userResponse.message === 'Unauthorized') {
+              console.log('Token expired or invalid, clearing token');
+              await removeAuthToken();
+              setToken(null);
+              setUser(null);
+              setIsGuest(false);
+            } else {
+              // For other errors, keep the token and cached user
+              console.warn('User data fetch failed, but keeping token:', userResponse.message);
             }
-          });
-          // Set as guest mode so user can still use the app
-          setIsGuest(true);
+          }
+        } catch (apiError: any) {
+          // Check if it's a timeout or network error
+          const isTimeout = apiError?.message?.includes('timeout');
+          const isNetworkError = apiError?.message?.includes('Network') || apiError?.message?.includes('fetch');
+          
+          if (isTimeout || isNetworkError) {
+            // For timeout/network errors, use cached user data if available
+            // User stays authenticated with their token
+            console.warn('Network/timeout error during auth, using cached user data if available');
+            if (!cachedUser) {
+              // If no cached user, we still have the token, so user is authenticated
+              // They just need to wait for network to fetch user data
+              console.log('No cached user, but token is valid - user will be authenticated once network is available');
+            }
+            setIsGuest(false);
+          } else {
+            // For other errors, check if it's an auth error
+            if (apiError?.message?.includes('Unauthorized') || apiError?.message?.includes('401')) {
+              console.log('Unauthorized error, clearing token');
+              await removeAuthToken();
+              setToken(null);
+              setUser(null);
+              setIsGuest(false);
+            } else {
+              // Unknown error - keep token and cached user
+              console.warn('Unknown error during auth, keeping token:', apiError);
+              setIsGuest(false);
+            }
+          }
         }
       } else {
-        // console.log('No saved token found');
+        // No saved token found - user needs to login
+        setIsGuest(false);
       }
     } catch (error) {
       console.error('Error initializing auth:', error);
-      // Only clear state if it's a critical error, not just API timeout
-      if (error instanceof Error && error.message.includes('timeout')) {
-        // console.log('Auth timeout, but continuing with offline mode');
-      } else {
+      // Only clear state if it's a critical error
+      if (error instanceof Error && !error.message.includes('timeout') && !error.message.includes('Network')) {
         await removeAuthToken();
         setToken(null);
         setUser(null);
       }
+      setIsGuest(false);
     } finally {
       setIsLoading(false);
-      // console.log('Auth initialization complete');
     }
   };
 
@@ -347,12 +368,14 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       // console.log('Login response:', response);
       
       if (response.success && response.token) {
-        // console.log('Login successful, setting token and user...');
         setToken(response.token);
         setUser(response.user);
         setIsGuest(false); // Guest becomes authenticated user
         await saveAuthToken(response.token);
-        // console.log('Login process complete');
+        // Cache user data for persistence
+        if (response.user) {
+          await saveCachedUser(response.user);
+        }
         return { success: true };
       } else {
         console.error('Login failed:', response);
@@ -377,6 +400,10 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
         setUser(response.user);
         setIsGuest(false); // Guest becomes authenticated user
         await saveAuthToken(response.token);
+        // Cache user data for persistence
+        if (response.user) {
+          await saveCachedUser(response.user);
+        }
         return { success: true };
       } else {
         console.error('Registration failed:', response);
@@ -393,7 +420,7 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       router.push("/login");
-      await removeAuthToken();
+      await removeAuthToken(); // This also removes cached user
       setToken(null);
       setUser(null);
       setIsGuest(false);
@@ -455,6 +482,8 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       const response = await authAPI.updateProfile(profileData, token);
       if (response.success && response.data && response.data.user) {
         setUser(response.data.user);
+        // Cache updated user data
+        await saveCachedUser(response.data.user);
         return { success: true };
       } else {
         return { success: false, error: response.message || 'Failed to update profile' };

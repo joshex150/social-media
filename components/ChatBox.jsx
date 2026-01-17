@@ -202,6 +202,8 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+    paddingHorizontal: 4
+
   },
   messageContainer: {
     maxWidth: '75%',

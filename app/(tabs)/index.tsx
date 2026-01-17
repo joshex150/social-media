@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, RefreshControl, Dimensions } from "react-native";
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, RefreshControl, Dimensions, AppState } from "react-native";
 import { useSafeAreaStyle } from "@/hooks/useSafeAreaStyle";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { useTheme } from "../../contexts/ThemeContext";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActivityCard from "@/components/ActivityCard";
 import VibeCheck from "@/components/VibeCheck";
 import RequestBanner from "@/components/RequestBanner";
@@ -35,7 +36,7 @@ export default function HomeScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
-  const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+  const [activityMode, setActivityMode] = useState<'normal' | 'side-quest' | null>(null);
   const [countdown, setCountdown] = useState<string>('');
   const { alert, showAlert, hideAlert } = useCustomAlert();
 
@@ -51,7 +52,9 @@ export default function HomeScreen() {
     refreshData,
     joinActivity,
     leaveActivity,
-    respondToJoinRequest
+    respondToJoinRequest,
+    isAuthenticated,
+    isGuest
   } = useApi();
 
 
@@ -114,10 +117,47 @@ export default function HomeScreen() {
     }
   };
 
-  const handleVibeFeedback = async (vibe: string) => {
-    setVibeFeedback(vibe);
-    showAlert('Thank you!', 'Your feedback has been recorded.', 'success');
+  const handleVibeFeedback = async (mode: string | null) => {
+    if (mode) {
+      setActivityMode(mode as 'normal' | 'side-quest');
+      showAlert('Mode Updated!', `You're now in ${mode === 'normal' ? 'Normal Mode' : 'Side Quest Mode'}`, 'success');
+    } else {
+      setActivityMode(null);
+      showAlert('Mode Cleared', 'Activity mode has been cleared. Showing all activities.', 'success');
+    }
   };
+
+  // Load saved mode on mount and when screen is focused
+  const loadMode = useCallback(async () => {
+    try {
+      const savedMode = await AsyncStorage.getItem('activityMode');
+      if (savedMode && (savedMode === 'normal' || savedMode === 'side-quest')) {
+        setActivityMode(savedMode as 'normal' | 'side-quest');
+      } else {
+        setActivityMode(null);
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMode();
+    
+    // Set up interval to reload mode periodically (in case it was cleared from settings)
+    const interval = setInterval(() => {
+      loadMode();
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [loadMode]);
+
+  // Reload mode when screen comes into focus (e.g., returning from settings)
+  useFocusEffect(
+    useCallback(() => {
+      loadMode();
+    }, [loadMode])
+  );
 
   const getUnreadNotificationsCount = () => {
     return notifications?.filter(notification => !notification.isRead).length || 0;
@@ -212,15 +252,58 @@ export default function HomeScreen() {
     }
   };
 
-  // Filter upcoming activities
+  // Filter upcoming activities based on selected mode
   const upcomingActivities = useMemo(() => {
     if (!activities) return [];
     const now = new Date();
-    return activities.filter(activity => {
+    let filtered = activities.filter(activity => {
       const activityDate = new Date(activity.date);
       return activityDate > now && activity.status === 'upcoming';
     });
-  }, [activities]);
+
+    // Apply mode-based filtering
+    if (activityMode) {
+      const userInterests = user?.preferences?.categories || [];
+      
+      if (activityMode === 'normal') {
+        // Normal mode: Show activities based on interests, prioritize lower plan creators (free/silver)
+        if (userInterests.length > 0) {
+          filtered = filtered.filter(activity => {
+            // Filter by interests
+            return userInterests.includes(activity.category);
+          });
+        }
+        // If no interests, show all activities but still prioritize by plan
+        
+        // Sort: prioritize lower plan creators (free, silver) first
+        filtered.sort((a, b) => {
+          const planOrder = { 'free': 0, 'silver': 1, 'gold': 2, 'platinum': 3 };
+          const aPlan = planOrder[a.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          const bPlan = planOrder[b.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          return aPlan - bPlan;
+        });
+      } else if (activityMode === 'side-quest') {
+        // Side Quest mode: Show activities NOT in interests, prioritize higher plan creators (gold/platinum)
+        if (userInterests.length > 0) {
+          filtered = filtered.filter(activity => {
+            // Show activities that are NOT in user interests
+            return !userInterests.includes(activity.category);
+          });
+        }
+        // If no interests, show all activities (everything is "new")
+        
+        // Sort: prioritize higher plan creators (gold, platinum) first
+        filtered.sort((a, b) => {
+          const planOrder = { 'free': 3, 'silver': 2, 'gold': 1, 'platinum': 0 };
+          const aPlan = planOrder[a.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          const bPlan = planOrder[b.createdBy?.subscription as keyof typeof planOrder] ?? 3;
+          return aPlan - bPlan;
+        });
+      }
+    }
+
+    return filtered;
+  }, [activities, activityMode, user?.preferences?.categories]);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -309,11 +392,11 @@ export default function HomeScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-      {/* FotMob-style Header */}
-      {nearestJoinedActivity ? (
-        <View style={[styles.matchHeaderContainer, safeArea.header]}>
+      {/* FotMob-style Header - Only show for authenticated users */}
+      {isAuthenticated && !isGuest && nearestJoinedActivity ? (
+        <View style={[styles.matchHeaderContainer, {paddingTop: 50}]}>
           <TouchableOpacity 
-            style={[styles.matchHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+            style={[styles.matchHeader, { borderBottomColor: colors.border }]}
             onPress={() => handleViewActivity(nearestJoinedActivity._id)}
             activeOpacity={0.8}
           >
@@ -338,7 +421,7 @@ export default function HomeScreen() {
                   }}
                 >
                   <FontAwesome name="bell" size={20} color={colors.foreground} />
-                  {getUnreadNotificationsCount() > 0 && (
+                  {isAuthenticated && !isGuest && getUnreadNotificationsCount() > 0 && (
                     <View style={[styles.headerNotificationBadge, { backgroundColor: colors.error }]}>
                       <Text style={[styles.headerNotificationBadgeText, { color: colors.background }]}>
                         {getUnreadNotificationsCount()}
@@ -346,7 +429,7 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   style={styles.headerIconButton}
                   onPress={(e) => {
                     e.stopPropagation();
@@ -354,7 +437,7 @@ export default function HomeScreen() {
                   }}
                 >
                   <FontAwesome name="heart" size={20} color={colors.foreground} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             </View>
             
@@ -458,29 +541,34 @@ export default function HomeScreen() {
                 <Text style={[styles.title, { color: colors.foreground }]}>Welcome back!</Text>
               </View>
               <View style={styles.headerRight}>
-                <TouchableOpacity
-                  style={styles.notificationButton}
-                  onPress={() => router.push('/system-notifications')}
-                >
-                  <View style={styles.notificationButtonIcon}>
-                    <FontAwesome name="bell" size={20} color={colors.foreground} />
-                    {getUnreadNotificationsCount() > 0 && (
-                      <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
-                        <Text style={[styles.notificationBadgeText, { color: colors.background }]}>
-                          {getUnreadNotificationsCount()}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                {isAuthenticated && !isGuest && (
+                  <TouchableOpacity
+                    style={styles.notificationButton}
+                    onPress={() => router.push('/system-notifications')}
+                  >
+                    <View style={styles.notificationButtonIcon}>
+                      <FontAwesome name="bell" size={20} color={colors.foreground} />
+                      {getUnreadNotificationsCount() > 0 && (
+                        <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
+                          <Text style={[styles.notificationBadgeText, { color: colors.background }]}>
+                            {getUnreadNotificationsCount()}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
-          <Text style={[styles.subtitle, { color: colors.muted }]}>Connect with people around you</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            {isGuest ? 'Login to access all features' : 'Connect with people around you'}
+          </Text>
         </>
       )}
 
-      {/* Stats Cards - Redesigned */}
+      {/* Stats Cards - Redesigned - Only show for authenticated users */}
+      {isAuthenticated && !isGuest && (
       <View style={styles.statsContainer}>
         {/* Main Stats Row - Horizontal Cards */}
         <View style={styles.mainStatsRow}>
@@ -552,9 +640,10 @@ export default function HomeScreen() {
           </View>
         </View> */}
       </View>
+      )}
 
-      {/* Join Requests Banner */}
-      {joinRequests.length > 0 && (
+      {/* Join Requests Banner - Only show for authenticated users */}
+      {isAuthenticated && !isGuest && joinRequests.length > 0 && (
         <View style={styles.requestsContainer}>
           <Text style={styles.requestsTitle}>Join Requests</Text>
           {joinRequests.slice(0, 2).map((request) => (
@@ -594,10 +683,25 @@ export default function HomeScreen() {
               key={activity._id}
               activity={activity}
               currentUserId={user?.id}
-              onJoin={() => handleJoinActivity(activity._id)}
+              onJoin={isGuest ? () => {
+                showAlert('Login Required', 'Please login to join activities', 'info', [
+                  { text: 'Cancel', style: 'cancel', onPress: () => {} },
+                  { text: 'Login', onPress: () => router.push('/login') }
+                ]);
+              } : () => handleJoinActivity(activity._id)}
               onView={() => handleViewActivity(activity._id)}
-              onManage={(activityId: string) => router.push(`/activity/${activityId}/manage`)}
-              onLeave={() => handleLeaveActivity(activity._id)}
+              onManage={isGuest ? () => {
+                showAlert('Login Required', 'Please login to manage activities', 'info', [
+                  { text: 'Cancel', style: 'cancel', onPress: () => {} },
+                  { text: 'Login', onPress: () => router.push('/login') }
+                ]);
+              } : (activityId: string) => router.push(`/activity/${activityId}/manage`)}
+              onLeave={isGuest ? () => {
+                showAlert('Login Required', 'Please login to leave activities', 'info', [
+                  { text: 'Cancel', style: 'cancel', onPress: () => {} },
+                  { text: 'Login', onPress: () => router.push('/login') }
+                ]);
+              } : () => handleLeaveActivity(activity._id)}
             />
           ))
         ) : (
@@ -615,8 +719,8 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Recent Notifications */}
-      {notifications?.length > 0 && (
+      {/* Recent Notifications - Only show for authenticated users */}
+      {isAuthenticated && !isGuest && notifications?.length > 0 && (
         <View style={styles.notificationsSection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Notifications</Text>
@@ -1038,7 +1142,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.lg,
     borderBottomWidth: 1,
-    borderRadius: BORDER_RADIUS.large,
+    // borderRadius: BORDER_RADIUS.large,
     minHeight: 180,
   },
   matchHeaderTop: {
