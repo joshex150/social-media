@@ -6,17 +6,24 @@ import {
   Text,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSafeAreaStyle } from '@/hooks/useSafeAreaStyle';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTheme } from '@/contexts/ThemeContext';
 import MapView from '@/components/MapView';
 import ChatBox from '@/components/ChatBox';
 import FeedbackModal from '@/components/FeedbackModal';
+import HotAlertButton from '@/components/HotAlertButton';
 import { useApi } from '@/contexts/ApiContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/CustomAlert';
 import type { Activity, Chat } from '@/services/api';
+import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SPACING } from '@/constants/spacing';
+import { circleAPI } from '@/services/api';
+import { getAuthToken } from '@/services/api';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -26,8 +33,11 @@ export default function ActivityDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [showFeedback, setShowFeedback] = useState(false);
+  const [isParticipant, setIsParticipant] = useState(false);
+  const [locationTrackingActive, setLocationTrackingActive] = useState(false);
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
+  const { colors } = useTheme();
   const { id } = useLocalSearchParams();
   const { user } = useApi();
   const { activities, chats, loadActivities, loadChats } = useApi();
@@ -43,6 +53,17 @@ export default function ActivityDetailsScreen() {
     if (activityData) {
       setActivity(activityData);
       
+      // Check if user is a participant (participants are now always populated as User objects)
+      const participant = activityData.participants.some((p) => {
+        if (typeof p === 'object' && p !== null) {
+          const participantId = (p as any).id || (p as any)._id || p;
+          return participantId?.toString() === user?.id?.toString();
+        }
+        const pStr = typeof p === 'string' ? p : String(p);
+        return pStr === user?.id?.toString();
+      });
+      setIsParticipant(participant);
+      
       // Find associated chat
       const chatData = chats.find(c => c.activityId === activityData._id);
       if (chatData) {
@@ -54,7 +75,105 @@ export default function ActivityDetailsScreen() {
 
   useEffect(() => {
     loadActivityData();
-  }, [id]);
+  }, [id, activities, chats, user]);
+
+  // Location tracking during active events
+  useEffect(() => {
+    if (!activity || !isParticipant || !user?.id) return;
+
+    let locationInterval: ReturnType<typeof setInterval> | null = null;
+    let checkInterval: ReturnType<typeof setInterval> | null = null;
+
+    const startLocationTracking = async () => {
+      try {
+        // Request permissions
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('Location permission denied');
+          return;
+        }
+
+        // Check if location services are available
+        const enabled = await Location.hasServicesEnabledAsync();
+        if (!enabled) {
+          console.log('Location services are disabled');
+          return;
+        }
+
+        // Start location tracking
+        locationInterval = setInterval(async () => {
+          if (!activity || !locationTrackingActive) {
+            if (locationInterval) {
+              clearInterval(locationInterval);
+              locationInterval = null;
+            }
+            return;
+          }
+
+          try {
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+
+            const token = await getAuthToken();
+            if (token) {
+              await circleAPI.updateLocation(
+                activity._id,
+                location.coords.latitude,
+                location.coords.longitude,
+                location.coords.accuracy || undefined,
+                token
+              );
+            }
+          } catch (error) {
+            console.error('Error updating location:', error);
+            // Stop tracking on persistent errors
+            if (locationInterval) {
+              clearInterval(locationInterval);
+              locationInterval = null;
+            }
+            setLocationTrackingActive(false);
+          }
+        }, 30000); // Update every 30 seconds
+      } catch (error) {
+        console.error('Error starting location tracking:', error);
+        setLocationTrackingActive(false);
+      }
+    };
+
+    const checkAndStartTracking = async () => {
+      const now = new Date();
+      const activityDate = new Date(activity.date);
+      const endDate = new Date(activityDate.getTime() + (activity.duration * 60000));
+
+      // Only track during active event
+      if (now >= activityDate && now <= endDate) {
+        if (!locationTrackingActive) {
+          setLocationTrackingActive(true);
+          await startLocationTracking();
+        }
+      } else {
+        setLocationTrackingActive(false);
+        if (locationInterval) {
+          clearInterval(locationInterval);
+          locationInterval = null;
+        }
+      }
+    };
+
+    checkAndStartTracking();
+    checkInterval = setInterval(checkAndStartTracking, 60000); // Check every minute
+
+    return () => {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
+      if (locationInterval) {
+        clearInterval(locationInterval);
+      }
+      setLocationTrackingActive(false);
+    };
+  }, [activity, isParticipant, user, locationTrackingActive]);
 
   const handleJoinActivity = () => {
     showAlert(
@@ -128,65 +247,70 @@ export default function ActivityDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centerContent, safeArea.content]}>
-        <FontAwesome name="spinner" size={32} color="#000" />
-        <Text style={styles.loadingText}>Loading activity...</Text>
+      <View style={[styles.container, styles.centerContent, safeArea.content, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.foreground} />
+        <Text style={[styles.loadingText, { color: colors.muted }]}>Loading activity...</Text>
       </View>
     );
   }
 
   if (!activity) {
     return (
-      <View style={[styles.container, styles.centerContent, safeArea.content]}>
-        <FontAwesome name="exclamation-triangle" size={48} color="#ccc" />
-        <Text style={styles.errorTitle}>Activity not found</Text>
-        <Text style={styles.errorSubtitle}>This activity may have been removed or doesn't exist.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
+      <View style={[styles.container, styles.centerContent, safeArea.content, { backgroundColor: colors.background }]}>
+        <FontAwesome name="exclamation-triangle" size={48} color={colors.muted} />
+        <Text style={[styles.errorTitle, { color: colors.foreground }]}>Activity not found</Text>
+        <Text style={[styles.errorSubtitle, { color: colors.muted }]}>This activity may have been removed or doesn't exist.</Text>
+        <TouchableOpacity 
+          style={[styles.errorBackButton, { backgroundColor: colors.foreground }]} 
+          onPress={() => router.back()}
+        >
+          <Text style={[styles.errorBackButtonText, { color: colors.background }]}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, safeArea.content]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={20} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{activity.title}</Text>
-        <TouchableOpacity onPress={() => setShowFeedback(true)} style={styles.feedbackButton}>
-          <Text style={styles.feedbackButtonText}>Feedback</Text>
-        </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header with Safe Area */}
+      <View style={[styles.headerContainer, safeArea.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <FontAwesome name="arrow-left" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{activity.title}</Text>
+          <TouchableOpacity onPress={() => setShowFeedback(true)} style={styles.feedbackButton}>
+            <FontAwesome name="heart-o" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'details' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'details' && [styles.activeTab, { borderBottomColor: colors.foreground }]]}
           onPress={() => setActiveTab('details')}
         >
-          <FontAwesome name="info-circle" size={16} color={activeTab === 'details' ? "#000" : "#666"} />
-          <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
+          <FontAwesome name="info-circle" size={18} color={activeTab === 'details' ? colors.foreground : colors.muted} />
+          <Text style={[styles.tabText, { color: activeTab === 'details' ? colors.foreground : colors.muted }]}>
             Details
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'map' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'map' && [styles.activeTab, { borderBottomColor: colors.foreground }]]}
           onPress={() => setActiveTab('map')}
         >
-          <FontAwesome name="map-marker" size={16} color={activeTab === 'map' ? "#000" : "#666"} />
-          <Text style={[styles.tabText, activeTab === 'map' && styles.activeTabText]}>
+          <FontAwesome name="map-marker" size={18} color={activeTab === 'map' ? colors.foreground : colors.muted} />
+          <Text style={[styles.tabText, { color: activeTab === 'map' ? colors.foreground : colors.muted }]}>
             Map
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'chat' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'chat' && [styles.activeTab, { borderBottomColor: colors.foreground }]]}
           onPress={() => setActiveTab('chat')}
         >
-          <FontAwesome name="comment" size={16} color={activeTab === 'chat' ? "#000" : "#666"} />
-          <Text style={[styles.tabText, activeTab === 'chat' && styles.activeTabText]}>
+          <FontAwesome name="comment" size={18} color={activeTab === 'chat' ? colors.foreground : colors.muted} />
+          <Text style={[styles.tabText, { color: activeTab === 'chat' ? colors.foreground : colors.muted }]}>
             Chat
           </Text>
         </TouchableOpacity>
@@ -203,51 +327,51 @@ export default function ActivityDetailsScreen() {
           )}
 
           {/* Basic Info */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Activity Information</Text>
+          <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoTitle, { color: colors.foreground }]}>Activity Information</Text>
             <View style={styles.infoRow}>
-              <FontAwesome name="calendar" size={16} color="#666" />
-              <Text style={styles.infoLabel}>Date:</Text>
-              <Text style={styles.infoValue}>{formatDate(activity.date)}</Text>
+              <FontAwesome name="calendar" size={18} color={colors.muted} />
+              <Text style={[styles.infoLabel, { color: colors.muted }]}>Date:</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{formatDate(activity.date)}</Text>
             </View>
             <View style={styles.infoRow}>
-              <FontAwesome name="clock-o" size={16} color="#666" />
-              <Text style={styles.infoLabel}>Time:</Text>
-              <Text style={styles.infoValue}>{formatTime(activity.date)}</Text>
+              <FontAwesome name="clock-o" size={18} color={colors.muted} />
+              <Text style={[styles.infoLabel, { color: colors.muted }]}>Time:</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{formatTime(activity.date)}</Text>
             </View>
             <View style={styles.infoRow}>
-              <FontAwesome name="map-marker" size={16} color="#666" />
-              <Text style={styles.infoLabel}>Location:</Text>
-              <Text style={styles.infoValue}>{activity.location.name}</Text>
+              <FontAwesome name="map-marker" size={18} color={colors.muted} />
+              <Text style={[styles.infoLabel, { color: colors.muted }]}>Location:</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{activity.location.name}</Text>
             </View>
             <View style={styles.infoRow}>
-              <FontAwesome name="users" size={16} color="#666" />
-              <Text style={styles.infoLabel}>Participants:</Text>
-              <Text style={styles.infoValue}>
+              <FontAwesome name="users" size={18} color={colors.muted} />
+              <Text style={[styles.infoLabel, { color: colors.muted }]}>Participants:</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>
                 {activity.participants.length}/{activity.maxParticipants}
               </Text>
             </View>
             <View style={styles.infoRow}>
-              <FontAwesome name="tag" size={16} color="#666" />
-              <Text style={styles.infoLabel}>Category:</Text>
-              <Text style={styles.infoValue}>{activity.category}</Text>
+              <FontAwesome name="tag" size={18} color={colors.muted} />
+              <Text style={[styles.infoLabel, { color: colors.muted }]}>Category:</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{activity.category}</Text>
             </View>
           </View>
 
           {/* Description */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Description</Text>
-            <Text style={styles.description}>{activity.description}</Text>
+          <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoTitle, { color: colors.foreground }]}>Description</Text>
+            <Text style={[styles.description, { color: colors.foreground }]}>{activity.description}</Text>
           </View>
 
           {/* Tags */}
           {activity.tags && activity.tags.length > 0 && (
-            <View style={styles.infoCard}>
-              <Text style={styles.infoTitle}>Tags</Text>
+            <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.infoTitle, { color: colors.foreground }]}>Tags</Text>
               <View style={styles.tagsContainer}>
                 {activity.tags.map((tag, index) => (
-                  <View key={index} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag}</Text>
+                  <View key={`tag-${tag}-${index}`} style={[styles.tag, { backgroundColor: colors.border }]}>
+                    <Text style={[styles.tagText, { color: colors.foreground }]}>{tag}</Text>
                   </View>
                 ))}
               </View>
@@ -255,23 +379,45 @@ export default function ActivityDetailsScreen() {
           )}
 
           {/* Participants */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Participants ({activity.participants.length})</Text>
+          <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoTitle, { color: colors.foreground }]}>Participants ({activity.participants.length})</Text>
             {activity.participants.map((participant) => (
-              <View key={participant.id} style={styles.participantItem}>
-                <View style={styles.participantAvatar}>
-                  <FontAwesome name="user" size={16} color="#000" />
+              <View key={`participant-${participant.id}`} style={styles.participantItem}>
+                <View style={[styles.participantAvatar, { backgroundColor: colors.border }]}>
+                  <FontAwesome name="user" size={18} color={colors.foreground} />
                 </View>
-                <Text style={styles.participantName}>{participant.name}</Text>
+                <Text style={[styles.participantName, { color: colors.foreground }]}>{participant.name}</Text>
               </View>
             ))}
           </View>
 
+          {/* Hot Alert Button - Only shows during active event for participants */}
+          {isParticipant && activity && (
+            <HotAlertButton
+              activityId={activity._id}
+              activityDate={activity.date}
+              activityDuration={activity.duration}
+              isParticipant={isParticipant}
+            />
+          )}
+
           {/* Join Button */}
-          <TouchableOpacity style={styles.joinButton} onPress={handleJoinActivity}>
-            <FontAwesome name="plus" size={20} color="#fff" />
-            <Text style={styles.joinButtonText}>Join Activity</Text>
-          </TouchableOpacity>
+          {!isParticipant && (
+            <TouchableOpacity style={[styles.joinButton, { backgroundColor: colors.foreground }]} onPress={handleJoinActivity}>
+              <FontAwesome name="plus" size={20} color={colors.background} />
+              <Text style={[styles.joinButtonText, { color: colors.background }]}>Join Activity</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Location Tracking Indicator */}
+          {locationTrackingActive && (
+            <View style={[styles.trackingIndicator, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <FontAwesome name="map-marker" size={16} color={colors.accent} />
+              <Text style={[styles.trackingText, { color: colors.muted }]}>
+                Live location tracking active
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -327,189 +473,182 @@ export default function ActivityDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: PADDING.content.horizontal,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 16,
+    fontSize: FONT_SIZES.md,
+    marginTop: MARGIN.section.top,
   },
   errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
+    marginTop: MARGIN.section.top,
+    marginBottom: MARGIN.text.bottom,
   },
   errorSubtitle: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: FONT_SIZES.md,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: MARGIN.section.bottom,
+    paddingHorizontal: PADDING.content.horizontal,
+  },
+  errorBackButton: {
+    paddingHorizontal: PADDING.button.horizontal * 2,
+    paddingVertical: PADDING.button.vertical + 4,
+    borderRadius: BORDER_RADIUS.large,
+  },
+  errorBackButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
+  },
+  headerContainer: {
+    borderBottomWidth: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.header.vertical,
   },
   backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
-    marginLeft: 8,
+    padding: SPACING.xs,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
     flex: 1,
-    marginHorizontal: 16,
+    marginHorizontal: MARGIN.section.top,
   },
   feedbackButton: {
-    paddingVertical: 4,
-  },
-  feedbackButtonText: {
-    fontSize: 14,
-    color: '#000',
-    fontWeight: '500',
+    padding: SPACING.xs,
   },
   tabContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: PADDING.header.vertical + 2,
+    paddingHorizontal: PADDING.content.horizontal,
+    gap: GAPS.small,
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#000',
+    borderBottomWidth: 3,
   },
   tabText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#000',
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semibold,
   },
   tabContent: {
     flex: 1,
   },
   tabContentContainer: {
-    padding: 16,
+    padding: PADDING.content.horizontal,
+    paddingBottom: PADDING.content.horizontal * 2,
   },
   imageContainer: {
     height: 200,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.large,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: MARGIN.section.bottom,
   },
   imagePlaceholder: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: FONT_SIZES.md,
   },
   infoCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.large,
+    padding: PADDING.card.horizontal + 4,
+    marginBottom: MARGIN.section.bottom,
   },
   infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    marginBottom: MARGIN.component.bottom,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: MARGIN.text.bottom + 4,
+    gap: GAPS.small,
   },
   infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 8,
-    minWidth: 80,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    minWidth: 90,
   },
   infoValue: {
-    fontSize: 14,
-    color: '#000',
+    fontSize: FONT_SIZES.md,
     flex: 1,
+    fontWeight: FONT_WEIGHTS.medium,
   },
   description: {
-    fontSize: 14,
-    color: '#000',
-    lineHeight: 20,
+    fontSize: FONT_SIZES.md,
+    lineHeight: FONT_SIZES.md * 1.5,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: GAPS.small,
   },
   tag: {
-    backgroundColor: '#e9ecef',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginRight: 8,
-    marginBottom: 8,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: PADDING.button.horizontal,
+    paddingVertical: PADDING.buttonSmall.vertical,
   },
   tagText: {
-    fontSize: 12,
-    color: '#000',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: FONT_WEIGHTS.medium,
   },
   participantItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: MARGIN.text.bottom + 4,
+    gap: GAPS.medium,
   },
   participantAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e9ecef',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   participantName: {
-    fontSize: 14,
-    color: '#000',
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
   },
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000',
-    borderRadius: 8,
-    paddingVertical: 16,
-    marginTop: 16,
+    borderRadius: BORDER_RADIUS.large,
+    paddingVertical: PADDING.button.vertical + 8,
+    marginTop: MARGIN.section.top,
+    gap: GAPS.medium,
   },
   joinButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 8,
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+  },
+  trackingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: PADDING.buttonSmall.vertical,
+    paddingHorizontal: PADDING.button.horizontal,
+    borderRadius: BORDER_RADIUS.medium,
+    borderWidth: 1,
+    marginTop: MARGIN.text.bottom,
+    gap: GAPS.small,
+  },
+  trackingText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
   },
 });

@@ -633,3 +633,60 @@ export const removeAuthToken = async (): Promise<void> => {
     console.error('Error removing auth token:', error);
   }
 };
+
+// Circle API
+export const circleAPI = {
+  getCircle: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/circle`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  addToInnerCircle: async (userId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/circle/inner/${userId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  removeFromInnerCircle: async (userId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/circle/inner/${userId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  sendHotAlert: async (activityId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/circle/hot-alert`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ activityId }),
+    });
+    return response.json();
+  },
+
+  updateLocation: async (activityId: string, latitude: number, longitude: number, accuracy?: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/circle/location`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ activityId, latitude, longitude, accuracy }),
+    });
+    return response.json();
+  },
+
+  getHotAlerts: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/circle/hot-alerts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  },
+};

@@ -237,7 +237,7 @@ export default function CreateActivityScreen() {
           | "tech",
         location: {
           name: formData.location,
-          address: formData.address,
+          address: formData.address || '',
           latitude: formData.latitude,
           longitude: formData.longitude,
         },
@@ -245,7 +245,7 @@ export default function CreateActivityScreen() {
         duration: formData.duration,
         maxParticipants: formData.maxParticipants,
         radius: formData.radius,
-        tags: selectedTags,
+        tags: selectedTags.length > 0 ? selectedTags : [],
       };
 
       const result = await createActivity(activityData);

@@ -577,6 +577,19 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       const response = await activitiesAPI.createActivity(activityData, token);
       if (response.success) {
         await loadActivities(); // Refresh activities list
+        await loadChats(); // Refresh chats list to include the new chat
+        // Refresh user data to update stats (activity count)
+        if (token) {
+          try {
+            const userResponse = await authAPI.getCurrentUser(token);
+            if (userResponse.success && userResponse.data && userResponse.data.user) {
+              setUser(userResponse.data.user);
+            }
+          } catch (error) {
+            console.error('Error refreshing user data:', error);
+            // Don't fail the activity creation if user refresh fails
+          }
+        }
         return { success: true };
       } else {
         // Extract error messages from validation errors array

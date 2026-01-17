@@ -11,7 +11,7 @@ import VibeCheck from "@/components/VibeCheck";
 import RequestBanner from "@/components/RequestBanner";
 import RefreshLoader from "@/components/RefreshLoader";
 import CustomAlert from "@/components/CustomAlert";
-import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from "@/constants/spacing";
+import { PADDING, MARGIN, GAPS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SPACING } from "@/constants/spacing";
 import { useApi } from "@/contexts/ApiContext";
 import type { Activity, JoinRequest, Notification } from "@/services/api";
 
@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<string>('');
   const { alert, showAlert, hideAlert } = useCustomAlert();
 
   const safeArea = useSafeAreaStyle();
@@ -49,6 +50,7 @@ export default function HomeScreen() {
     loadNotifications, 
     refreshData,
     joinActivity,
+    leaveActivity,
     respondToJoinRequest
   } = useApi();
 
@@ -121,6 +123,95 @@ export default function HomeScreen() {
     return notifications?.filter(notification => !notification.isRead).length || 0;
   };
 
+  // Find the nearest/closest activity the user has joined
+  const nearestJoinedActivity = useMemo(() => {
+    if (!activities || !user?.id) return null;
+    
+    const now = new Date();
+    const joinedActivities = activities.filter(activity => {
+      // Check if user is a participant
+      const isParticipant = Array.isArray(activity.participants) && 
+        activity.participants.some((p: any) => {
+          if (typeof p === 'object' && p !== null) {
+            return (p._id?.toString() === user.id?.toString()) || 
+                   (p.id?.toString() === user.id?.toString());
+          }
+          return p?.toString() === user.id?.toString();
+        });
+      
+      // Check if activity is upcoming
+      const activityDate = new Date(activity.date);
+      return isParticipant && activityDate > now && activity.status === 'upcoming';
+    });
+    
+    if (joinedActivities.length === 0) return null;
+    
+    // Sort by date and return the nearest one
+    return joinedActivities.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    )[0];
+  }, [activities, user]);
+
+  // Countdown timer for nearest activity
+  useEffect(() => {
+    if (!nearestJoinedActivity) {
+      setCountdown('');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const activityDate = new Date(nearestJoinedActivity.date);
+      const diff = activityDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setCountdown('00:00:00');
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setCountdown(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      );
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [nearestJoinedActivity]);
+
+  const formatActivityTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const formatActivityDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+  };
+
   // Filter upcoming activities
   const upcomingActivities = useMemo(() => {
     if (!activities) return [];
@@ -157,13 +248,28 @@ export default function HomeScreen() {
       const result = await joinActivity(activityId);
       if (result.success) {
         showAlert('Success', 'You have joined the activity!', 'success');
+        await refreshData(); // Refresh to update participant status
       } else {
         showAlert('Error', result.error || 'Failed to join activity', 'error');
       }
     } catch (error) {
       showAlert('Error', 'Failed to join activity', 'error');
     }
-  }, [joinActivity]);
+  }, [joinActivity, refreshData]);
+
+  const handleLeaveActivity = useCallback(async (activityId: string) => {
+    try {
+      const result = await leaveActivity(activityId);
+      if (result.success) {
+        showAlert('Success', 'You have left the activity', 'success');
+        await refreshData(); // Refresh to update participant status
+      } else {
+        showAlert('Error', result.error || 'Failed to leave activity', 'error');
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to leave activity', 'error');
+    }
+  }, [leaveActivity, refreshData]);
 
   const handleViewActivity = useCallback((activityId: string) => {
     router.push(`/activity/${activityId}`);
@@ -190,6 +296,7 @@ export default function HomeScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -202,30 +309,176 @@ export default function HomeScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-      {/* Header */}
-      <View style={[styles.header, safeArea.header]}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Welcome back!</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.notificationButton}
-            onPress={() => router.push('/system-notifications')}
+      {/* FotMob-style Header */}
+      {nearestJoinedActivity ? (
+        <View style={[styles.matchHeaderContainer, safeArea.header]}>
+          <TouchableOpacity 
+            style={[styles.matchHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+            onPress={() => handleViewActivity(nearestJoinedActivity._id)}
+            activeOpacity={0.8}
           >
-            <View style={styles.notificationButtonIcon}>
-              <FontAwesome name="bell" size={20} color={colors.foreground} />
-              {getUnreadNotificationsCount() > 0 && (
-                <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
-                  <Text style={[styles.notificationBadgeText, { color: colors.background }]}>
-                    {getUnreadNotificationsCount()}
+            {/* Top Row - Date, Time, Icons */}
+            <View style={styles.matchHeaderTop}>
+              <View style={styles.matchHeaderTopLeft}>
+                <Text style={[styles.matchHeaderLabel, { color: colors.muted }]}>
+                  {formatActivityDate(nearestJoinedActivity.date)}
+                </Text>
+              </View>
+              <View style={styles.matchHeaderTopCenter}>
+                <Text style={[styles.matchTime, { color: colors.foreground }]}>
+                  {formatActivityTime(nearestJoinedActivity.date)}
+                </Text>
+              </View>
+              <View style={styles.matchHeaderTopRight}>
+                <TouchableOpacity
+                  style={styles.headerIconButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push('/system-notifications');
+                  }}
+                >
+                  <FontAwesome name="bell" size={20} color={colors.foreground} />
+                  {getUnreadNotificationsCount() > 0 && (
+                    <View style={[styles.headerNotificationBadge, { backgroundColor: colors.error }]}>
+                      <Text style={[styles.headerNotificationBadgeText, { color: colors.background }]}>
+                        {getUnreadNotificationsCount()}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.headerIconButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push(`/activity/${nearestJoinedActivity._id}`);
+                  }}
+                >
+                  <FontAwesome name="heart" size={20} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            {/* Main Info Row - Activity Details */}
+            <View style={styles.matchInfoContainer}>
+              <View style={styles.matchTeamLeft}>
+                <View style={[styles.matchTeamLogo, { backgroundColor: colors.border }]}>
+                  <FontAwesome 
+                    name={
+                      nearestJoinedActivity.category === 'fitness' ? 'heart' :
+                      nearestJoinedActivity.category === 'learning' ? 'book' :
+                      nearestJoinedActivity.category === 'food' ? 'cutlery' :
+                      nearestJoinedActivity.category === 'travel' ? 'plane' :
+                      nearestJoinedActivity.category === 'music' ? 'music' :
+                      nearestJoinedActivity.category === 'sports' ? 'futbol-o' :
+                      nearestJoinedActivity.category === 'tech' ? 'laptop' : 'users'
+                    } 
+                    size={28} 
+                    color={colors.foreground} 
+                  />
+                </View>
+                <View style={styles.matchTeamInfo}>
+                  <Text 
+                    style={[styles.matchTeamName, { color: colors.foreground }]} 
+                    numberOfLines={2}
+                  >
+                    {nearestJoinedActivity.title}
+                  </Text>
+                  <Text 
+                    style={[styles.matchTeamSubtext, { color: colors.muted }]} 
+                    numberOfLines={1}
+                  >
+                    {nearestJoinedActivity.category}
                   </Text>
                 </View>
-              )}
+              </View>
+              
+              <View style={styles.matchCenter}>
+                {countdown && (
+                  <>
+                    <Text style={[styles.matchCountdown, { color: colors.foreground }]}>
+                      {countdown}
+                    </Text>
+                    <Text style={[styles.matchCountdownLabel, { color: colors.muted }]}>
+                      Time until start
+                    </Text>
+                  </>
+                )}
+              </View>
+              
+              <View style={styles.matchTeamRight}>
+                <View style={styles.matchTeamInfo}>
+                  <Text 
+                    style={[styles.matchTeamName, { color: colors.foreground, textAlign: 'right' }]} 
+                    numberOfLines={2}
+                  >
+                    {nearestJoinedActivity.location.name}
+                  </Text>
+                  <Text 
+                    style={[styles.matchTeamSubtext, { color: colors.muted, textAlign: 'right' }]} 
+                    numberOfLines={1}
+                  >
+                    Location
+                  </Text>
+                </View>
+                <View style={[styles.matchTeamLogo, { backgroundColor: colors.border }]}>
+                  <FontAwesome name="map-marker" size={24} color={colors.foreground} />
+                </View>
+              </View>
+            </View>
+            
+            {/* Bottom Info Bar */}
+            <View style={[styles.matchBottomBar, { borderTopColor: colors.border }]}>
+              <View style={styles.matchInfoItem}>
+                <FontAwesome name="users" size={14} color={colors.muted} />
+                <Text style={[styles.matchInfoText, { color: colors.muted }]}>
+                  {nearestJoinedActivity.participants.length}/{nearestJoinedActivity.maxParticipants} joined
+                </Text>
+              </View>
+              <View style={styles.matchInfoItem}>
+                <FontAwesome name="clock-o" size={14} color={colors.muted} />
+                <Text style={[styles.matchInfoText, { color: colors.muted }]}>
+                  {nearestJoinedActivity.duration}min
+                </Text>
+              </View>
+              <View style={styles.matchInfoItem}>
+                <FontAwesome name="circle" size={6} color={colors.accent} />
+                <Text style={[styles.matchInfoText, { color: colors.accent }]}>
+                  Joined
+                </Text>
+              </View>
             </View>
           </TouchableOpacity>
         </View>
-      </View>
-      <Text style={[styles.subtitle, { color: colors.muted }]}>Connect with people around you</Text>
+      ) : (
+        // Fallback header when no joined activity
+        <>
+          <View style={[styles.headerContainer, safeArea.header]}>
+            <View style={[styles.header, { backgroundColor: colors.background }]}>
+              <View style={styles.headerLeft}>
+                <Text style={[styles.title, { color: colors.foreground }]}>Welcome back!</Text>
+              </View>
+              <View style={styles.headerRight}>
+                <TouchableOpacity
+                  style={styles.notificationButton}
+                  onPress={() => router.push('/system-notifications')}
+                >
+                  <View style={styles.notificationButtonIcon}>
+                    <FontAwesome name="bell" size={20} color={colors.foreground} />
+                    {getUnreadNotificationsCount() > 0 && (
+                      <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
+                        <Text style={[styles.notificationBadgeText, { color: colors.background }]}>
+                          {getUnreadNotificationsCount()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>Connect with people around you</Text>
+        </>
+      )}
 
       {/* Stats Cards - Redesigned */}
       <View style={styles.statsContainer}>
@@ -246,7 +499,11 @@ export default function HomeScreen() {
             </View>
           </View>
           
-          <View style={[styles.mainStatsCard, styles.secondaryCard]}>
+          <TouchableOpacity 
+            style={[styles.mainStatsCard, styles.secondaryCard]}
+            onPress={() => router.push('/circle')}
+            activeOpacity={0.8}
+          >
             <View style={styles.cardHeader}>
               <View style={[styles.mainStatsIconContainer, { backgroundColor: colors.surface }]}>
                 <FontAwesome name="users" size={24} color={colors.foreground} />
@@ -257,9 +514,9 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.mainStatsNumberSecondary}>{stats.totalConnections}</Text>
-              <Text style={styles.mainStatsLabelSecondary}>Connections</Text>
+              <Text style={styles.mainStatsLabelSecondary}>Circle</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Secondary Stats Row - Compact Cards */}
@@ -336,8 +593,11 @@ export default function HomeScreen() {
             <ActivityCard
               key={activity._id}
               activity={activity}
+              currentUserId={user?.id}
               onJoin={() => handleJoinActivity(activity._id)}
               onView={() => handleViewActivity(activity._id)}
+              onManage={(activityId: string) => router.push(`/activity/${activityId}/manage`)}
+              onLeave={() => handleLeaveActivity(activity._id)}
             />
           ))
         ) : (
@@ -447,10 +707,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: PADDING.content.horizontal,
     paddingVertical: PADDING.content.vertical,
   },
+  headerContainer: {
+    width: '100%',
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: PADDING.content.horizontal,
+    paddingVertical: PADDING.header.vertical,
     marginBottom: PADDING.content.vertical,
   },
   headerLeft: {
@@ -761,6 +1026,138 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: FONT_SIZES.sm,
     marginTop: GAPS.small,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  // FotMob-style header styles
+  matchHeaderContainer: {
+    marginBottom: MARGIN.section.bottom,
+    marginHorizontal: -PADDING.content.horizontal, // Counteract ScrollView padding for full width
+  },
+  matchHeader: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+    borderBottomWidth: 1,
+    borderRadius: BORDER_RADIUS.large,
+    minHeight: 180,
+  },
+  matchHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.lg,
+  },
+  matchHeaderTopLeft: {
+    flex: 1,
+  },
+  matchHeaderTopCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  matchHeaderTopRight: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: GAPS.medium,
+  },
+  matchHeaderLabel: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  matchTime: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
+  },
+  headerIconButton: {
+    padding: SPACING.sm,
+    position: 'relative',
+  },
+  headerNotificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  headerNotificationBadgeText: {
+    fontSize: FONT_SIZES.xs - 1,
+    fontWeight: FONT_WEIGHTS.bold,
+  },
+  matchInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.lg,
+  },
+  matchTeamLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: GAPS.medium,
+  },
+  matchTeamRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: GAPS.medium,
+  },
+  matchTeamLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchTeamInfo: {
+    flex: 1,
+  },
+  matchTeamName: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
+    marginBottom: SPACING.xs / 2,
+  },
+  matchTeamSubtext: {
+    fontSize: FONT_SIZES.xs,
+    textTransform: 'capitalize',
+  },
+  matchCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
+    minWidth: 100,
+  },
+  matchCountdown: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+  },
+  matchCountdownLabel: {
+    fontSize: FONT_SIZES.xs,
+    marginTop: SPACING.xs / 2,
+    textAlign: 'center',
+  },
+  matchBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+  },
+  matchInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: GAPS.small,
+  },
+  matchInfoText: {
+    fontSize: FONT_SIZES.xs,
     fontWeight: FONT_WEIGHTS.medium,
   },
 });

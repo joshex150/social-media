@@ -286,10 +286,14 @@ export default function ProfileScreen() {
               <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.activitiesJoined || 0}</Text>
               <Text style={[styles.statLabel, { color: colors.muted }]}>Joined</Text>
             </View>
-            <View style={styles.statItem}>
+            <TouchableOpacity 
+              style={styles.statItem}
+              onPress={() => router.push('/circle')}
+              activeOpacity={0.7}
+            >
               <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.connectionsMade || 0}</Text>
-              <Text style={[styles.statLabel, { color: colors.muted }]}>Connections</Text>
-            </View>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>Circle</Text>
+            </TouchableOpacity>
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, { color: colors.foreground }]}>{user?.stats?.streakDays || 0}</Text>
               <Text style={[styles.statLabel, { color: colors.muted }]}>Day Streak</Text>

@@ -33,7 +33,7 @@ export default function ExploreScreen() {
 
   const safeArea = useSafeAreaStyle();
   const router = useRouter();
-  const { activities, loadActivities, refreshData } = useApi();
+  const { user, activities, loadActivities, refreshData, joinActivity, leaveActivity } = useApi();
   const { alert, showAlert, hideAlert } = useCustomAlert();
 
   // Filter activities when they change
@@ -75,21 +75,32 @@ export default function ExploreScreen() {
     filterActivities(activities, selectedRadius, category);
   };
 
-  const handleJoinActivity = (activityId: string) => {
-    showAlert(
-      'Join Activity',
-      'Request to join this activity?',
-      'info',
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => {} },
-        { 
-          text: 'Join', 
-          onPress: () => {
-            showAlert('Success', 'Join request sent!', 'success');
-          }
-        }
-      ]
-    );
+  const handleJoinActivity = async (activityId: string) => {
+    try {
+      const result = await joinActivity(activityId);
+      if (result.success) {
+        showAlert('Success', 'You have joined the activity!', 'success');
+        await refreshData();
+      } else {
+        showAlert('Error', result.error || 'Failed to join activity', 'error');
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to join activity', 'error');
+    }
+  };
+
+  const handleLeaveActivity = async (activityId: string) => {
+    try {
+      const result = await leaveActivity(activityId);
+      if (result.success) {
+        showAlert('Success', 'You have left the activity', 'success');
+        await refreshData();
+      } else {
+        showAlert('Error', result.error || 'Failed to leave activity', 'error');
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to leave activity', 'error');
+    }
   };
 
   const handleViewActivity = (activityId: string) => {
@@ -188,8 +199,11 @@ export default function ExploreScreen() {
             <ActivityCard
               key={activity._id}
               activity={activity}
+              currentUserId={user?.id}
               onJoin={() => handleJoinActivity(activity._id)}
+              onLeave={() => handleLeaveActivity(activity._id)}
               onView={() => handleViewActivity(activity._id)}
+              onManage={(activityId: string) => router.push(`/activity/${activityId}/manage`)}
             />
           ))
       ) : (
